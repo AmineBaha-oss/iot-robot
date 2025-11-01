@@ -1,0 +1,20 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Local data/logs/artifacts
+data/
+logs/
+*.csv
+*.jsonl
+
+# Secrets / config (keep samples instead)
+src/adafruit.json
+config/*.env
+*.env
+
+# OS/editor
+.DS_Store
+*.swp
