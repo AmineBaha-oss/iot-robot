@@ -62,7 +62,7 @@ The modular architecture of the codebase allows for easy maintenance and future 
 
 ```
 [IR/Ultrasonic/Camera] --> car_tui & line_follow --> /tmp caches
-                                      \--> telemetry/ --> Adafruit IO + CSV
+                                      \--> telemetry/ --> Adafruit IO
 ```
 
 ---
