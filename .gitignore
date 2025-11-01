@@ -12,8 +12,12 @@ logs/
 
 # Secrets / config (keep samples instead)
 src/adafruit.json
+src/.merged_adafruit.json
 config/*.env
 *.env
+
+# Server folder (removed from tracking)
+src/Server/
 
 # OS/editor
 .DS_Store
