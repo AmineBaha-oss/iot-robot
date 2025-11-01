@@ -1,8 +1,12 @@
 # -*-coding: utf-8 -*-
 import time
+import sys
+from pathlib import Path
+# Add parent directory to path for parameter module
+sys.path.insert(0, str(Path(__file__).parent.parent))
 from parameter import ParameterManager
-from rpi_ledpixel import Freenove_RPI_WS281X
-from spi_ledpixel import Freenove_SPI_LedPixel
+from .rpi_ledpixel import Freenove_RPI_WS281X
+from .spi_ledpixel import Freenove_SPI_LedPixel
 
 class Led:
     def __init__(self):

@@ -1,4 +1,4 @@
-from adc import Adc
+from .adc import Adc
 import time
 
 class Photoresistor:

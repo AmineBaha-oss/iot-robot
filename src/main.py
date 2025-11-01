@@ -6,17 +6,17 @@ import signal
 import math
 from PyQt5.QtWidgets import QMainWindow, QApplication
 from PyQt5.QtCore import QTimer
-from server_ui import Ui_server_ui
-from server import Server
+from server.server_ui import Ui_server_ui
+from server.server import Server
 import threading
 import multiprocessing
-from message import Message_Parse
-from command import Command
-from led import Led
-from camera import Camera
+from server.message import Message_Parse
+from server.command import Command
+from hardware.led import Led
+from hardware.camera import Camera
 from car import Car
-from buzzer import Buzzer
-from Thread import stop_thread
+from hardware.buzzer import Buzzer
+from server.Thread import stop_thread
 from threading import Thread
 
 class mywindow(QMainWindow, Ui_server_ui):

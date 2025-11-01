@@ -1,5 +1,5 @@
 import time
-from pca9685 import PCA9685
+from .pca9685 import PCA9685
 
 class Ordinary_Car:
     def __init__(self):

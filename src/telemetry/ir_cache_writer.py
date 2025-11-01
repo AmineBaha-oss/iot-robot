@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 import time
 from pathlib import Path
-from infrared import Infrared
+from hardware.infrared import Infrared
 
 IR_CACHE   = Path('/tmp/ir_triplet.txt')
 LINE_CACHE = Path('/tmp/line_state.txt')

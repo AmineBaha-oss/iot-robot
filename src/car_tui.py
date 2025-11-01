@@ -8,7 +8,7 @@ from typing import Optional
 # -----------------------------------------------------------------------------
 car = None
 try:
-    from motor import Ordinary_Car
+    from hardware.motor import Ordinary_Car
     car = Ordinary_Car()
 except Exception:
     car = None
@@ -17,7 +17,7 @@ class SmartBuzzer:
     def __init__(self):
         self.b = None
         try:
-            from buzzer import Buzzer
+            from hardware.buzzer import Buzzer
             self.b = Buzzer()
         except Exception:
             self.b = None
@@ -47,14 +47,18 @@ class SmartLED:
         self.count = 8
         self.mask  = 0xFF
         try:
-            # params.json optional
+            # params.json optional - check config/ first
             try:
-                cfg = json.load(open(os.path.join(os.path.dirname(__file__), "params.json")))
-                self.count = int(cfg.get("Led_Count", 8))
-                self.mask  = int(str(cfg.get("Led_Mask", "0xFF")), 16)
+                config_path = Path(__file__).parent.parent / "config" / "params.json"
+                if not config_path.exists():
+                    config_path = Path(__file__).parent / "params.json"
+                if config_path.exists():
+                    cfg = json.load(open(config_path))
+                    self.count = int(cfg.get("Led_Count", 8))
+                    self.mask  = int(str(cfg.get("Led_Mask", "0xFF")), 16)
             except Exception:
                 pass
-            from led import Led
+            from hardware.led import Led
             L = Led()
             self.impl = getattr(L, "strip", None) or L
             set_cnt = getattr(self.impl, "set_led_count", None)
@@ -91,7 +95,7 @@ leds = SmartLED()
 # Servos (optional)
 pan = tilt = None
 try:
-    from servo import Servo
+    from hardware.servo import Servo
     _servo = Servo()
     def set_servo_angle(ch: str, deg: int):
         for name in ("set_servo_angle","setServoAngle","set_servo_pwm","setServoPwm"):
@@ -110,7 +114,7 @@ except Exception:
 # Ultrasonic (lazy)
 Ultrasonic = None
 try:
-    from ultrasonic import Ultrasonic as _U
+    from hardware.ultrasonic import Ultrasonic as _U
     Ultrasonic = _U
 except Exception:
     Ultrasonic = None

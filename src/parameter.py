@@ -2,26 +2,41 @@
 import os
 import json
 import subprocess
+from pathlib import Path
 
 class ParameterManager:
-    # Define the default parameter file name
+    # Define the default parameter file name - check config/ first, then current directory
+    _CONFIG_DIR = Path(__file__).parent.parent / "config"
     PARAM_FILE = 'params.json'
+    
+    def _find_param_file(self, file_path: str = None) -> str:
+        """Find params.json in config/ directory first, then fallback to current directory."""
+        if file_path:
+            return file_path
+        # Check config/ directory first
+        config_file = self._CONFIG_DIR / self.PARAM_FILE
+        if config_file.exists():
+            return str(config_file)
+        # Fallback to current directory
+        return self.PARAM_FILE
 
     def __init__(self):
         # Initialize the file path to the default parameter file
         if self.file_exists() == False or self.validate_params() == False:
             self.deal_with_param()
 
-    def file_exists(self, file_path: str = PARAM_FILE) -> bool:
+    def file_exists(self, file_path: str = None) -> bool:
         """Check if the specified file exists."""
-        return os.path.exists(file_path)
+        path = self._find_param_file(file_path)
+        return os.path.exists(path)
 
-    def validate_params(self, file_path: str = PARAM_FILE) -> bool:
+    def validate_params(self, file_path: str = None) -> bool:
         """Validate that the parameter file exists and contains valid parameters."""
-        if not self.file_exists(file_path):
+        path = self._find_param_file(file_path)
+        if not self.file_exists(path):
             return False
         try:
-            with open(file_path, 'r') as file:
+            with open(path, 'r') as file:
                 params = json.load(file)
                 # Check if required parameters are present and valid
                 required_params = {
@@ -40,40 +55,44 @@ class ParameterManager:
             print(f"Error reading file: {e}")
             return False
 
-    def get_param(self, param_name: str, file_path: str = PARAM_FILE) -> any:
+    def get_param(self, param_name: str, file_path: str = None) -> any:
         """Get the value of a specified parameter from the parameter file."""
-        if self.validate_params(file_path):
-            with open(file_path, 'r') as file:
+        path = self._find_param_file(file_path)
+        if self.validate_params(path):
+            with open(path, 'r') as file:
                 params = json.load(file)
                 return params.get(param_name)
         return None
 
-    def set_param(self, param_name: str, value: any, file_path: str = PARAM_FILE) -> None:
+    def set_param(self, param_name: str, value: any, file_path: str = None) -> None:
         """Set the value of a specified parameter in the parameter file."""
+        path = self._find_param_file(file_path)
         params = {}
-        if self.file_exists(file_path):
-            with open(file_path, 'r') as file:
+        if self.file_exists(path):
+            with open(path, 'r') as file:
                 params = json.load(file)
         params[param_name] = value
-        with open(file_path, 'w') as file:
+        with open(path, 'w') as file:
             json.dump(params, file, indent=4)
 
-    def delete_param_file(self, file_path: str = PARAM_FILE) -> None:
+    def delete_param_file(self, file_path: str = None) -> None:
         """Delete the specified parameter file."""
-        if self.file_exists(file_path):
-            os.remove(file_path)
-            print(f"Deleted {file_path}")
+        path = self._find_param_file(file_path)
+        if self.file_exists(path):
+            os.remove(path)
+            print(f"Deleted {path}")
         else:
-            print(f"File {file_path} does not exist")
+            print(f"File {path} does not exist")
 
-    def create_param_file(self, file_path: str = PARAM_FILE) -> None:
+    def create_param_file(self, file_path: str = None) -> None:
         """Create a parameter file and set default parameters."""
+        path = self._find_param_file(file_path)
         default_params = {
             'Connect_Version': 2,
             'Pcb_Version': 1,
             'Pi_Version': self.get_raspberry_pi_version()
         }
-        with open(file_path, 'w') as file:
+        with open(path, 'w') as file:
             json.dump(default_params, file, indent=4)
 
     def get_raspberry_pi_version(self) -> int:
@@ -141,7 +160,7 @@ if __name__ == '__main__':
     # Entry point of the script
     manager = ParameterManager()
     manager.deal_with_param()
-    if manager.file_exists("params.json") and manager.validate_params("params.json"):
+    if manager.file_exists() and manager.validate_params():
         connect_version = manager.get_connect_version()
         print(f"Connect Version: {connect_version}.0")
         pcb_version = manager.get_pcb_version()

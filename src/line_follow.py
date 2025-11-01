@@ -25,8 +25,8 @@ def _ir_cache_write(L, M, R):
     except Exception:
         pass
 
-from motor import Ordinary_Car
-from infrared import Infrared
+from hardware.motor import Ordinary_Car
+from hardware.infrared import Infrared
 
 def clamp(x, lo, hi): 
     return lo if x < lo else hi if x > hi else x
