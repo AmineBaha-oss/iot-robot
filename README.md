@@ -40,8 +40,6 @@ The modular architecture of the codebase allows for easy maintenance and future 
 - [Auto-Start (optional)](#auto-start-optional)
 - [Data Format Spec](#data-format-spec)
 - [Safety Notes](#safety-notes)
-- [Known Limitations / Future Work](#known-limitations--future-work)
-- [License](#license)
 - [Quick Commands](#quick-commands)
 
 ---
@@ -405,18 +403,6 @@ python3 main.py                 # Server GUI
 
 ---
 
-## License
-
-[Add your license here]
-
----
-
-## Known Limitations / Future Work
-
-- Camera thumbnails require OpenCV (optional)
-- Telemetry uses cache files to avoid GPIO conflicts
-- MQTT connection handles reconnects automatically
-- CSV logs rotate daily automatically
 
 ---
 
