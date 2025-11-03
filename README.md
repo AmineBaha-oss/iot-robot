@@ -6,8 +6,8 @@ IoT Smart Mobile Robot (Raspberry Pi) — Telemetry (IR line sensors, ultrasonic
 
 ## Video Demonstration
 
-**[Video Link Placeholder]** - _Coming soon: Watch YVLSWITCH in action!_
-
+[[**[Video Link Placeholder]** - _Coming soon: Watch YVLSWITCH in action!_](https://www.youtube.com/watch?v=mzLmGYfJ0nY)
+](https://www.youtube.com/watch?v=mzLmGYfJ0nY)
 ---
 
 ## Project Reflection
