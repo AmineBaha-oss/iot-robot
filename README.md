@@ -4,6 +4,7 @@ IoT Smart Mobile Robot (Raspberry Pi) — Telemetry (IR line sensors, ultrasonic
 
 > Organized codebase with modular structure: hardware interfaces, server modules, telemetry utilities, and main applications.
 
+
 ![Iot-Robot-Image](https://github.com/user-attachments/assets/b92f23f6-80a3-4ba6-83ea-996ce9e3bfbb)
 
 
