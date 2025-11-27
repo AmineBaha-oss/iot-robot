@@ -1,0 +1,158 @@
+{% extends "base.html" %} {% block title %}Home - IoT Smart Robot Car{% endblock
+%} {% block content %}
+<div class="container">
+  <h1 class="page-title">System Overview</h1>
+
+  <div class="dashboard-grid">
+    <!-- Live Sensor Data Cards -->
+    <div class="card">
+      <div class="card-header">
+        <h3>📏 Ultrasonic Distance</h3>
+      </div>
+      <div class="card-body">
+        <div class="sensor-value" id="ultrasonic-value">--</div>
+        <div class="sensor-unit">cm</div>
+        <div class="sensor-update" id="ultrasonic-update">--</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <h3>🔴 IR Left</h3>
+      </div>
+      <div class="card-body">
+        <div class="sensor-value" id="ir-left-value">--</div>
+        <div class="sensor-update" id="ir-left-update">--</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <h3>🟡 IR Center</h3>
+      </div>
+      <div class="card-body">
+        <div class="sensor-value" id="ir-center-value">--</div>
+        <div class="sensor-update" id="ir-center-update">--</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <h3>🟢 IR Right</h3>
+      </div>
+      <div class="card-body">
+        <div class="sensor-value" id="ir-right-value">--</div>
+        <div class="sensor-update" id="ir-right-update">--</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <h3>📍 Line State</h3>
+      </div>
+      <div class="card-body">
+        <div class="sensor-value" id="line-state-value">---</div>
+        <div class="sensor-update" id="line-state-update">--</div>
+      </div>
+    </div>
+
+    <!-- System Status Card -->
+    <div class="card status-card">
+      <div class="card-header">
+        <h3>System Status</h3>
+      </div>
+      <div class="card-body">
+        <div class="status-item">
+          <span class="status-label">Connection:</span>
+          <span class="status-value" id="connection-status">Checking...</span>
+        </div>
+        <div class="status-item">
+          <span class="status-label">Last Update:</span>
+          <span class="status-value" id="last-update">--</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Quick Actions -->
+  <div class="quick-actions">
+    <h2>Quick Actions</h2>
+    <div class="action-buttons">
+      <a href="{{ url_for('sensor_data') }}" class="btn btn-primary"
+        >View Sensor Data</a
+      >
+      <a href="{{ url_for('control_car') }}" class="btn btn-secondary"
+        >Control Car</a
+      >
+      <a href="{{ url_for('line_tracking') }}" class="btn btn-success"
+        >Line Tracking</a
+      >
+      <a href="{{ url_for('obstacle_avoidance') }}" class="btn btn-warning"
+        >Obstacle Avoidance</a
+      >
+    </div>
+  </div>
+</div>
+{% endblock %} {% block scripts %}
+<script>
+  // Update live sensor data every 2 seconds
+  function updateLiveData() {
+    fetch("/api/live-data")
+      .then((response) => response.json())
+      .then((data) => {
+        // Update ultrasonic
+        if (data.ultrasonic_cm !== null) {
+          document.getElementById("ultrasonic-value").textContent = parseFloat(
+            data.ultrasonic_cm
+          ).toFixed(1);
+          document.getElementById("ultrasonic-update").textContent =
+            "Updated: " + new Date().toLocaleTimeString();
+        }
+
+        // Update IR sensors
+        if (data.ir_left !== null) {
+          document.getElementById("ir-left-value").textContent = data.ir_left;
+          document.getElementById("ir-left-update").textContent =
+            "Updated: " + new Date().toLocaleTimeString();
+        }
+        if (data.ir_center !== null) {
+          document.getElementById("ir-center-value").textContent =
+            data.ir_center;
+          document.getElementById("ir-center-update").textContent =
+            "Updated: " + new Date().toLocaleTimeString();
+        }
+        if (data.ir_right !== null) {
+          document.getElementById("ir-right-value").textContent = data.ir_right;
+          document.getElementById("ir-right-update").textContent =
+            "Updated: " + new Date().toLocaleTimeString();
+        }
+
+        // Update line state
+        if (data.line_state !== null) {
+          document.getElementById("line-state-value").textContent =
+            data.line_state;
+          document.getElementById("line-state-update").textContent =
+            "Updated: " + new Date().toLocaleTimeString();
+        }
+
+        // Update connection status
+        document.getElementById("connection-status").textContent = "Connected";
+        document.getElementById("connection-status").className =
+          "status-value status-connected";
+        document.getElementById("last-update").textContent =
+          new Date().toLocaleString();
+      })
+      .catch((error) => {
+        console.error("Error fetching live data:", error);
+        document.getElementById("connection-status").textContent =
+          "Disconnected";
+        document.getElementById("connection-status").className =
+          "status-value status-disconnected";
+      });
+  }
+
+  // Update immediately and then every 2 seconds
+  updateLiveData();
+  setInterval(updateLiveData, 2000);
+</script>
+{% endblock %}

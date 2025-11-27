@@ -1,0 +1,69 @@
+{% extends "base.html" %} {% block title %}About - IoT Smart Robot Car{%
+endblock %} {% block content %}
+<div class="container">
+  <h1 class="page-title">About</h1>
+
+  <div class="about-content">
+    <div class="card">
+      <h2>Project Information</h2>
+      <p>
+        <strong>Course:</strong> 420-N55: IoT: Design and Prototyping of
+        Connected Devices
+      </p>
+      <p><strong>Institution:</strong> Champlain College Saint-Lambert</p>
+      <p><strong>Professor:</strong> Haikel Hichri</p>
+      <p><strong>Semester:</strong> Fall 2025</p>
+    </div>
+
+    <div class="card">
+      <h2>System Architecture</h2>
+      <p>This IoT Smart Robot Car system consists of:</p>
+      <ul>
+        <li>
+          <strong>Raspberry Pi:</strong> Main controller running Python
+          applications
+        </li>
+        <li>
+          <strong>Sensors:</strong> Ultrasonic distance sensor, IR line sensors
+          (left, center, right)
+        </li>
+        <li><strong>Actuators:</strong> DC motors, LEDs, buzzer, servos</li>
+        <li>
+          <strong>Adafruit IO:</strong> Cloud platform for real-time data
+          streaming via MQTT
+        </li>
+        <li>
+          <strong>Cloud Database:</strong> Neon.com PostgreSQL for historical
+          data storage
+        </li>
+        <li>
+          <strong>Local Database:</strong> SQLite for offline data storage and
+          sync
+        </li>
+        <li>
+          <strong>Flask Web App:</strong> Web interface for monitoring and
+          control
+        </li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <h2>Features</h2>
+      <ul>
+        <li>Real-time sensor data monitoring</li>
+        <li>Historical data visualization with Chart.js</li>
+        <li>Remote car control (forward, backward, left, right)</li>
+        <li>Line following algorithm</li>
+        <li>Obstacle avoidance algorithm</li>
+        <li>Offline data storage with automatic sync</li>
+        <li>Device control (motors, LEDs, buzzer)</li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <h2>Team Members</h2>
+      <p>Add your team member names here</p>
+    </div>
+  </div>
+</div>
+{% endblock %}

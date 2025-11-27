@@ -1,8 +1,8 @@
 # YVLSWITCH
 
-IoT Smart Mobile Robot (Raspberry Pi) — Telemetry (IR line sensors, ultrasonic distance, camera status) → **Adafruit IO** via MQTT.
+IoT Smart Mobile Robot (Raspberry Pi) — Complete IoT system with telemetry, autonomous navigation, and **Flask web application** for remote monitoring and control.
 
-> Organized codebase with modular structure: hardware interfaces, server modules, telemetry utilities, and main applications.
+> Organized codebase with modular structure: hardware interfaces, server modules, telemetry utilities, Flask web app, and database sync.
 
 
 ![Iot-Robot-Image](https://github.com/user-attachments/assets/b92f23f6-80a3-4ba6-83ea-996ce9e3bfbb)
@@ -37,6 +37,8 @@ The modular architecture of the codebase allows for easy maintenance and future 
   - [C) Obstacle Navigator](#c-obstacle-navigator)
   - [D) Telemetry Publisher](#d-telemetry-publisher)
   - [E) Server Application (PyQt)](#e-server-application-pyqt)
+  - [F) Flask Web Application](#f-flask-web-application)
+  - [G) Command Listener (Raspberry Pi)](#g-command-listener-raspberry-pi)
   - [Typical Two-Terminal Setup](#typical-two-terminal-setup)
 - [Adafruit IO Dashboard](#adafruit-io-dashboard)
 - [Data Logging](#data-logging)
@@ -58,12 +60,15 @@ The modular architecture of the codebase allows for easy maintenance and future 
 
 - **Sensing layer:** IR triplet (line-follow), Ultrasonic (obstacles), Camera (status + optional thumbnail).
 - **Control layer:** Manual driving via `car_tui.py`; autonomous line-follow via `line_follow.py` (PID + pivot); obstacle avoidance via `obstacle_navigator.py`.
-- **Comms layer:** MQTT to Adafruit IO (feeds for sensors + status); TCP server for remote control.
-- **Data layer:** CSV logs with ISO timestamps, 1 file/day.
+- **Comms layer:** MQTT to Adafruit IO (feeds for sensors + status); TCP server for remote control; **Flask web app** for HTTP-based control.
+- **Data layer:** CSV logs with ISO timestamps, 1 file/day; **SQLite local database** with automatic sync to **Neon.com PostgreSQL**.
+- **Web layer:** Flask application with 6 pages (Home, About, Sensor Data, Control Car, Line Tracking, Obstacle Avoidance) deployed on **Render.com**.
 
 ```
 [IR/Ultrasonic/Camera] --> car_tui & line_follow --> /tmp caches
                                       \--> telemetry/ --> Adafruit IO
+                                                         \--> Flask Web App (Render.com)
+                                                         \--> Local SQLite --> Neon.com PostgreSQL
 ```
 
 ---
@@ -72,12 +77,30 @@ The modular architecture of the codebase allows for easy maintenance and future 
 
 ```
 YVLSWITCH/
+├── app.py                     # Flask web application (deploy to Render.com)
 ├── config/                    # Configuration files
 │   ├── adafruit.sample.json   # Adafruit IO credentials template
+│   ├── adafruit.json          # Adafruit IO credentials (not in git)
 │   ├── app.sample.json        # App settings template
 │   └── params.json            # Hardware parameters (auto-generated)
+├── templates/                 # Flask HTML templates
+│   ├── base.html              # Base template with navigation
+│   ├── home.html              # Dashboard/home page
+│   ├── about.html             # About page
+│   ├── sensor_data.html       # Historical sensor data with charts
+│   ├── control_car.html       # Remote car control
+│   ├── line_tracking.html     # Line tracking control
+│   └── obstacle_avoidance.html # Obstacle avoidance control
+├── static/                    # Static web assets
+│   ├── css/
+│   │   └── style.css          # Modern dark theme styling
+│   └── js/
+│       └── main.js            # JavaScript utilities
+├── db/                        # Local SQLite database (git-ignored)
+│   └── robot_telemetry.db     # Local offline storage
+├── data/                      # CSV log files (git-ignored)
+│   └── YYYY-MM-DD_robot_telemetry.csv
 ├── docs/                      # Documentation files
-├── logs/                      # Log files (git-ignored)
 ├── scripts/                   # Shell scripts
 │   ├── run_telemetry.sh       # Start telemetry daemon
 │   └── tail_today.sh          # Tail today's CSV log
@@ -95,13 +118,6 @@ YVLSWITCH/
 │   │   ├── servo.py           # Servo motor control
 │   │   ├── spi_ledpixel.py    # SPI LED driver
 │   │   └── ultrasonic.py      # Distance sensor
-│   ├── server/                # Server & communication
-│   │   ├── command.py         # Command parser
-│   │   ├── message.py         # Message parsing
-│   │   ├── server.py          # TCP server wrapper
-│   │   ├── server_ui.py        # PyQt UI definitions
-│   │   ├── tcp_server.py       # TCP/IP server
-│   │   └── Thread.py           # Thread utilities
 │   ├── telemetry/             # Telemetry & publishing
 │   │   ├── ir_cache_publisher.py
 │   │   ├── ir_cache_writer.py
@@ -110,17 +126,17 @@ YVLSWITCH/
 │   │   ├── telemetry_daemon.py # Telemetry daemon
 │   │   ├── telemetry_runner.py # Telemetry runner script
 │   │   └── ultra_cache_writer.py
-│   ├── utils/                 # Utility modules
-│   │   ├── aio_debug.py       # Adafruit IO debugging
-│   │   ├── mapping_override.py
-│   │   ├── sitecustomize.py  # Python customization
-│   │   └── test.py            # Test utilities
+│   ├── database_sync.py       # Database sync module (SQLite ↔ Neon.com)
+│   ├── command_listener.py    # MQTT command listener for web app
 │   ├── car.py                 # Main car control class
 │   ├── car_tui.py             # Terminal UI (curses)
 │   ├── line_follow.py         # Line following algorithm (PID)
 │   ├── main.py                # Server application (PyQt)
 │   ├── obstacle_navigator.py  # Obstacle avoidance
 │   └── parameter.py           # Parameter manager
+├── DEPLOYMENT_GUIDE.md        # Deployment instructions (Neon.com + Render.com)
+├── FLASK_SETUP.md             # Flask app setup guide
+├── MILESTONE3_SUMMARY.md      # Milestone 3 summary
 ├── requirements.txt
 └── README.md
 ```
@@ -324,10 +340,61 @@ python3 main.py
 python3 main.py --terminal
 ```
 
+### F) Flask Web Application
+
+Modern web interface for remote monitoring and control, deployed on Render.com:
+
+**Features:**
+- **6 Pages:** Home Dashboard, About, Sensor Data, Control Car, Line Tracking, Obstacle Avoidance
+- **Live Data:** Real-time sensor readings from Adafruit IO via HTTP
+- **Historical Data:** Chart.js graphs with date selection from cloud database
+- **Remote Control:** Control motors (forward/backward/left/right), LEDs, buzzer
+- **Algorithm Control:** Start/stop line tracking and obstacle avoidance
+- **Database Sync:** Local SQLite for offline storage, automatic sync to Neon.com PostgreSQL
+
+**Local Development:**
+```bash
+# Install Flask dependencies
+pip install -r requirements.txt
+
+# Run locally
+python app.py
+# App available at http://localhost:5000
+```
+
+**Deployment to Render.com:**
+1. Push code to GitHub
+2. Create Web Service on Render.com
+3. Set environment variables:
+   - `DATABASE_URL` (from Neon.com)
+   - `SECRET_KEY` (generate random key)
+4. Deploy!
+
+See `DEPLOYMENT_GUIDE.md` and `FLASK_SETUP.md` for detailed instructions.
+
+### G) Command Listener (Raspberry Pi)
+
+Listens to Adafruit IO MQTT feeds for web app commands:
+
+```bash
+cd src
+python3 command_listener.py
+```
+
+This script subscribes to control feeds and executes commands:
+- Motor control (forward, backward, left, right, stop)
+- LED control (on, off)
+- Buzzer control (on, off)
+- Line tracking (start, stop)
+- Obstacle avoidance (start, stop)
+
+**Note:** Run this on the Raspberry Pi to receive commands from the Flask web app.
+
 ### Typical Two-Terminal Setup
 
 - **Terminal 1:** `python3 car_tui.py` (GPIO in use here)
 - **Terminal 2:** `./scripts/run_telemetry.sh` (cache only → no GPIO conflict)
+- **Terminal 3 (optional):** `python3 src/command_listener.py` (for web app control)
 
 ---
 
@@ -335,15 +402,24 @@ python3 main.py --terminal
 
 Create a dashboard and add widgets for these feeds:
 
+**Sensor Feeds (for monitoring):**
 - `line-ir-left`, `line-ir-center`, `line-ir-right` (0/1)
 - `line-state` (e.g., `L`, `M`, `R`, `LM`, `LR`, `LMR`, `___`)
 - `ultra-distance` (cm)
 - `cam-status` (online/offline); optional `cam-thumb` (base64 jpg)
 
+**Control Feeds (for web app commands):**
+- `motor-control` (forward, backward, left, right, stop)
+- `led-control` (on, off)
+- `buzzer-control` (on, off)
+- `line-tracking` (start, stop)
+- `obstacle-avoidance` (start, stop)
+
 ---
 
 ## Data Logging
 
+**CSV Files:**
 CSV written to `data/YYYY-MM-DD_robot_telemetry.csv` with header:
 
 ```
@@ -357,6 +433,12 @@ Timestamps are local **ISO 8601** format.
 ```text
 2025-11-01T02:05:12,23.7,1,0,0,L__
 ```
+
+**Database Storage:**
+- **Local SQLite:** `db/robot_telemetry.db` - Stores data when offline
+- **Cloud PostgreSQL:** Neon.com - Historical data storage
+- **Auto-sync:** Background worker syncs local DB to cloud every 5 minutes
+- **Offline Support:** Data stored locally when internet is down, synced when connection restored
 
 ---
 
@@ -390,18 +472,23 @@ cp config/adafruit.sample.json config/adafruit.json
 cp config/app.sample.json config/app.local.json
 nano config/adafruit.json  # Add your credentials
 
-# Run applications
+# Run applications (Raspberry Pi)
 cd src
 python3 car_tui.py              # Manual control UI
 python3 line_follow.py          # Line following
 python3 obstacle_navigator.py   # Obstacle avoidance
 python3 main.py                 # Server GUI
+python3 command_listener.py     # Web app command listener
 
 # Telemetry (separate terminal)
 ./scripts/run_telemetry.sh
 
 # View logs
 ./scripts/tail_today.sh
+
+# Flask Web App (local development)
+python app.py                   # Run Flask app locally
+# Or deploy to Render.com (see DEPLOYMENT_GUIDE.md)
 ```
 
 ---
@@ -409,4 +496,29 @@ python3 main.py                 # Server GUI
 
 ---
 
-**Note:** This project is organized with a modular structure for maintainability. Hardware interfaces are separated from control logic, and telemetry utilities are isolated to prevent conflicts when running multiple applications simultaneously.
+## Web Application Features
+
+The Flask web application provides:
+
+- **Real-time Monitoring:** Live sensor data updates every 2 seconds
+- **Historical Analysis:** Chart.js graphs for any date with data selection
+- **Remote Control:** Full motor control (forward, backward, left, right, stop)
+- **Device Management:** Control LEDs and buzzer remotely
+- **Algorithm Control:** Start/stop line tracking and obstacle avoidance from web interface
+- **Offline Support:** Local SQLite database stores data when offline, syncs automatically
+- **Modern UI:** Dark theme with responsive design, similar to DomiSafe example
+
+**Access:** Deploy to Render.com and access from any device with a web browser.
+
+## Deployment
+
+- **Flask App:** Deploy to Render.com (see `DEPLOYMENT_GUIDE.md`)
+- **Database:** Neon.com PostgreSQL (free tier available)
+- **Adafruit IO:** Cloud MQTT platform for sensor data
+- **Raspberry Pi:** Runs telemetry daemon and command listener
+
+See `DEPLOYMENT_GUIDE.md` for step-by-step deployment instructions.
+
+---
+
+**Note:** This project is organized with a modular structure for maintainability. Hardware interfaces are separated from control logic, telemetry utilities are isolated to prevent conflicts, and the Flask web application provides a modern interface for remote monitoring and control.

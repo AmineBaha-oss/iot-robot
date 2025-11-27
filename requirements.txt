@@ -10,4 +10,13 @@ PyQt5>=5.15.0
 # GPIO control library for Raspberry Pi
 gpiozero>=1.6.0
 
+# Flask web framework
+Flask>=3.0.0
+
+# HTTP requests for Adafruit IO
+requests>=2.31.0
+
+# Database drivers
+psycopg2-binary>=2.9.0  # PostgreSQL for Neon.com
+
 

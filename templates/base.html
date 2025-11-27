@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{% block title %}IoT Smart Robot Car{% endblock %}</title>
+    <link
+      rel="stylesheet"
+      href="{{ url_for('static', filename='css/style.css') }}"
+    />
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  </head>
+  <body>
+    <nav class="navbar">
+      <div class="nav-container">
+        <div class="nav-logo">
+          <h1>🤖 Robot Car</h1>
+        </div>
+        <ul class="nav-menu">
+          <li><a href="{{ url_for('home') }}" class="nav-link">Home</a></li>
+          <li><a href="{{ url_for('about') }}" class="nav-link">About</a></li>
+          <li>
+            <a href="{{ url_for('sensor_data') }}" class="nav-link"
+              >Sensor Data</a
+            >
+          </li>
+          <li>
+            <a href="{{ url_for('control_car') }}" class="nav-link"
+              >Control Car</a
+            >
+          </li>
+          <li>
+            <a href="{{ url_for('line_tracking') }}" class="nav-link"
+              >Line Tracking</a
+            >
+          </li>
+          <li>
+            <a href="{{ url_for('obstacle_avoidance') }}" class="nav-link"
+              >Obstacle Avoidance</a
+            >
+          </li>
+        </ul>
+      </div>
+    </nav>
+
+    <main class="main-content">{% block content %}{% endblock %}</main>
+
+    <footer class="footer">
+      <p>&copy; 2025 IoT Smart Robot Car - Champlain College Saint-Lambert</p>
+    </footer>
+
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    {% block scripts %}{% endblock %}
+  </body>
+</html>
