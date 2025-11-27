@@ -3,7 +3,11 @@ import json, os, sys, datetime
 from pathlib import Path
 
 BASE = Path(__file__).resolve().parent
-CFG_PATH = BASE / "adafruit.json"
+# Look for config in config/ directory (parent of src/)
+CFG_PATH = BASE.parent.parent / "config" / "adafruit.json"
+# Fallback to src/telemetry/ if not found
+if not CFG_PATH.exists():
+    CFG_PATH = BASE / "adafruit.json"
 
 # Load your real runtime config (kept out of git)
 cfg = json.load(open(CFG_PATH))
