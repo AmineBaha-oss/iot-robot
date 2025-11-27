@@ -183,12 +183,17 @@ def send_adafruit_command(feed_key, value):
     try:
         feed_name = AIO_FEEDS.get(feed_key, "")
         if not feed_name:
+            print(f"Feed key '{feed_key}' not found in AIO_FEEDS")
             return False
         url = f"https://io.adafruit.com/api/v2/{AIO_USERNAME}/feeds/{feed_name}/data"
         headers = {"X-AIO-Key": AIO_KEY, "Content-Type": "application/json"}
         data = {"value": str(value)}
         response = requests.post(url, headers=headers, json=data, timeout=5)
-        return response.status_code == 201
+        # Accept both 200 (OK) and 201 (Created) as success
+        success = response.status_code in [200, 201]
+        if not success:
+            print(f"Adafruit IO returned status {response.status_code}: {response.text}")
+        return success
     except Exception as e:
         print(f"Error sending Adafruit command: {e}")
         return False
