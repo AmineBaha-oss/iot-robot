@@ -20,7 +20,13 @@ app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev-secret-key-change-i
 # Configuration paths
 BASE_DIR = Path(__file__).parent
 sys.path.insert(0, str(BASE_DIR / "src"))
-from database_sync import save_to_local_db, sync_to_cloud, check_internet
+from database_sync import (
+    save_to_local_db, 
+    sync_to_cloud, 
+    check_internet,
+    init_local_db,
+    get_cloud_connection
+)
 CONFIG_DIR = BASE_DIR / "config"
 DATA_DIR = BASE_DIR / "data"
 DB_DIR = BASE_DIR / "db"
@@ -66,77 +72,45 @@ SYNC_STATUS_FILE = DB_DIR / "sync_status.json"
 # Cloud database config (Neon.com PostgreSQL)
 CLOUD_DB_URL = os.environ.get("DATABASE_URL", "")  # Set in Render.com environment
 
-# Initialize local database
-def init_local_db():
-    """Initialize local SQLite database"""
-    conn = sqlite3.connect(LOCAL_DB)
-    c = conn.cursor()
-    c.execute('''
-        CREATE TABLE IF NOT EXISTS sensor_data (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            timestamp TEXT NOT NULL,
-            ultrasonic_cm REAL,
-            ir_left INTEGER,
-            ir_center INTEGER,
-            ir_right INTEGER,
-            line_state TEXT,
-            synced INTEGER DEFAULT 0
-        )
-    ''')
-    conn.commit()
-    conn.close()
-
+# Initialize local database (use function from database_sync module)
 init_local_db()
 
 # ============================================================================
 # Database Functions
 # ============================================================================
 
-def save_to_local_db(timestamp, ultrasonic=None, ir_left=None, ir_center=None, ir_right=None, line_state=None):
-    """Save sensor data to local SQLite database"""
-    try:
-        conn = sqlite3.connect(LOCAL_DB)
-        c = conn.cursor()
-        c.execute('''
-            INSERT INTO sensor_data (timestamp, ultrasonic_cm, ir_left, ir_center, ir_right, line_state, synced)
-            VALUES (?, ?, ?, ?, ?, ?, 0)
-        ''', (timestamp, ultrasonic, ir_left, ir_center, ir_right, line_state))
-        conn.commit()
-        conn.close()
-        return True
-    except Exception as e:
-        print(f"Error saving to local DB: {e}")
-        return False
-
-def get_unsynced_records():
-    """Get all unsynced records from local database"""
-    try:
-        conn = sqlite3.connect(LOCAL_DB)
-        c = conn.cursor()
-        c.execute('SELECT * FROM sensor_data WHERE synced = 0 ORDER BY id')
-        records = c.fetchall()
-        conn.close()
-        return records
-    except Exception as e:
-        print(f"Error getting unsynced records: {e}")
-        return []
-
-def mark_as_synced(record_ids):
-    """Mark records as synced"""
-    try:
-        conn = sqlite3.connect(LOCAL_DB)
-        c = conn.cursor()
-        placeholders = ','.join('?' * len(record_ids))
-        c.execute(f'UPDATE sensor_data SET synced = 1 WHERE id IN ({placeholders})', record_ids)
-        conn.commit()
-        conn.close()
-        return True
-    except Exception as e:
-        print(f"Error marking as synced: {e}")
-        return False
-
 def get_historical_data(date_str):
-    """Get historical data for a specific date from local DB"""
+    """Get historical data for a specific date from cloud DB (Neon.com) or local DB fallback"""
+    # Try cloud database first (for Render.com deployment)
+    if CLOUD_DB_URL:
+        conn, error = get_cloud_connection()
+        if conn:
+            try:
+                from psycopg2.extras import RealDictCursor
+                c = conn.cursor(cursor_factory=RealDictCursor)
+                # Query by date (PostgreSQL)
+                c.execute('''
+                    SELECT timestamp, ultrasonic_cm, ir_left, ir_center, ir_right, line_state
+                    FROM sensor_data
+                    WHERE DATE(timestamp) = %s
+                    ORDER BY timestamp
+                ''', (date_str,))
+                records = c.fetchall()
+                conn.close()
+                # Convert to list of tuples for compatibility
+                return [(r['timestamp'], r['ultrasonic_cm'], r['ir_left'], r['ir_center'], r['ir_right'], r['line_state']) 
+                        for r in records]
+            except Exception as e:
+                print(f"Error getting historical data from cloud DB: {e}")
+                try:
+                    conn.close()
+                except:
+                    pass
+                # Fall through to local DB
+        else:
+            print(f"Could not connect to cloud DB: {error}")
+    
+    # Fallback to local DB (for local development or if cloud fails)
     try:
         conn = sqlite3.connect(LOCAL_DB)
         c = conn.cursor()
@@ -150,7 +124,7 @@ def get_historical_data(date_str):
         conn.close()
         return records
     except Exception as e:
-        print(f"Error getting historical data: {e}")
+        print(f"Error getting historical data from local DB: {e}")
         return []
 
 # ============================================================================
@@ -239,102 +213,156 @@ def obstacle_avoidance():
 @app.route('/api/live-data')
 def api_live_data():
     """Get live sensor data from Adafruit IO"""
-    ultrasonic = get_adafruit_data("ultrasonic_cm")
-    ir_left = get_adafruit_data("ir_left")
-    ir_center = get_adafruit_data("ir_center")
-    ir_right = get_adafruit_data("ir_right")
-    line_state = get_adafruit_data("line_state")
-    timestamp = datetime.now().isoformat()
-    
-    # Save to local database (for offline storage)
-    save_to_local_db(
-        timestamp=timestamp,
-        ultrasonic=float(ultrasonic) if ultrasonic else None,
-        ir_left=int(ir_left) if ir_left else None,
-        ir_center=int(ir_center) if ir_center else None,
-        ir_right=int(ir_right) if ir_right else None,
-        line_state=line_state if line_state else None
-    )
-    
-    data = {
-        "ultrasonic_cm": ultrasonic,
-        "ir_left": ir_left,
-        "ir_center": ir_center,
-        "ir_right": ir_right,
-        "line_state": line_state,
-        "timestamp": timestamp
-    }
-    return jsonify(data)
+    try:
+        ultrasonic = get_adafruit_data("ultrasonic_cm")
+        ir_left = get_adafruit_data("ir_left")
+        ir_center = get_adafruit_data("ir_center")
+        ir_right = get_adafruit_data("ir_right")
+        line_state = get_adafruit_data("line_state")
+        timestamp = datetime.now().isoformat()
+        
+        # Save to local database (for offline storage) - only if we have data
+        try:
+            save_to_local_db(
+                timestamp=timestamp,
+                ultrasonic=float(ultrasonic) if ultrasonic else None,
+                ir_left=int(ir_left) if ir_left else None,
+                ir_center=int(ir_center) if ir_center else None,
+                ir_right=int(ir_right) if ir_right else None,
+                line_state=line_state if line_state else None
+            )
+        except Exception as e:
+            print(f"Warning: Could not save to local DB: {e}")
+        
+        data = {
+            "ultrasonic_cm": ultrasonic,
+            "ir_left": ir_left,
+            "ir_center": ir_center,
+            "ir_right": ir_right,
+            "line_state": line_state,
+            "timestamp": timestamp
+        }
+        return jsonify(data)
+    except Exception as e:
+        print(f"Error in api_live_data: {e}")
+        return jsonify({"error": "Internal server error"}), 500
 
 @app.route('/api/historical-data', methods=['POST'])
 def api_historical_data():
     """Get historical sensor data for a specific date"""
-    date_str = request.json.get('date')
-    if not date_str:
-        return jsonify({"error": "Date required"}), 400
-    
-    records = get_historical_data(date_str)
-    data = {
-        "timestamps": [r[0] for r in records],
-        "ultrasonic": [r[1] if r[1] is not None else None for r in records],
-        "ir_left": [r[2] if r[2] is not None else None for r in records],
-        "ir_center": [r[3] if r[3] is not None else None for r in records],
-        "ir_right": [r[4] if r[4] is not None else None for r in records],
-        "line_state": [r[5] if r[5] else "" for r in records]
-    }
-    return jsonify(data)
+    try:
+        if not request.json:
+            return jsonify({"error": "JSON body required"}), 400
+        
+        date_str = request.json.get('date')
+        if not date_str:
+            return jsonify({"error": "Date required"}), 400
+        
+        records = get_historical_data(date_str)
+        data = {
+            "timestamps": [r[0] for r in records],
+            "ultrasonic": [r[1] if r[1] is not None else None for r in records],
+            "ir_left": [r[2] if r[2] is not None else None for r in records],
+            "ir_center": [r[3] if r[3] is not None else None for r in records],
+            "ir_right": [r[4] if r[4] is not None else None for r in records],
+            "line_state": [r[5] if r[5] else "" for r in records]
+        }
+        return jsonify(data)
+    except Exception as e:
+        print(f"Error in api_historical_data: {e}")
+        return jsonify({"error": "Internal server error"}), 500
 
 @app.route('/api/control/motor', methods=['POST'])
 def api_control_motor():
     """Control car motors"""
-    action = request.json.get('action')  # forward, backward, left, right, stop
-    if action in ['forward', 'backward', 'left', 'right', 'stop']:
+    try:
+        if not request.json:
+            return jsonify({"error": "JSON body required"}), 400
+        
+        action = request.json.get('action')  # forward, backward, left, right, stop
+        if not isinstance(action, str) or action not in ['forward', 'backward', 'left', 'right', 'stop']:
+            return jsonify({"error": "Invalid action"}), 400
+        
         # Send command to Adafruit IO (which will be picked up by Raspberry Pi)
         success = send_adafruit_command("motor_control", action)
         return jsonify({"success": success, "action": action})
-    return jsonify({"error": "Invalid action"}), 400
+    except Exception as e:
+        print(f"Error in api_control_motor: {e}")
+        return jsonify({"error": "Internal server error"}), 500
 
 @app.route('/api/control/led', methods=['POST'])
 def api_control_led():
     """Control LEDs"""
-    state = request.json.get('state')  # on, off
-    if state in ['on', 'off']:
+    try:
+        if not request.json:
+            return jsonify({"error": "JSON body required"}), 400
+        
+        state = request.json.get('state')  # on, off
+        if not isinstance(state, str) or state not in ['on', 'off']:
+            return jsonify({"error": "Invalid state"}), 400
+        
         success = send_adafruit_command("led_control", state)
         return jsonify({"success": success, "state": state})
-    return jsonify({"error": "Invalid state"}), 400
+    except Exception as e:
+        print(f"Error in api_control_led: {e}")
+        return jsonify({"error": "Internal server error"}), 500
 
 @app.route('/api/control/buzzer', methods=['POST'])
 def api_control_buzzer():
     """Control buzzer"""
-    state = request.json.get('state')  # on, off
-    if state in ['on', 'off']:
+    try:
+        if not request.json:
+            return jsonify({"error": "JSON body required"}), 400
+        
+        state = request.json.get('state')  # on, off
+        if not isinstance(state, str) or state not in ['on', 'off']:
+            return jsonify({"error": "Invalid state"}), 400
+        
         success = send_adafruit_command("buzzer_control", state)
         return jsonify({"success": success, "state": state})
-    return jsonify({"error": "Invalid state"}), 400
+    except Exception as e:
+        print(f"Error in api_control_buzzer: {e}")
+        return jsonify({"error": "Internal server error"}), 500
 
 @app.route('/api/line-tracking/start', methods=['POST'])
 def api_line_tracking_start():
     """Start line tracking algorithm"""
-    success = send_adafruit_command("line_tracking", "start")
-    return jsonify({"success": success})
+    try:
+        success = send_adafruit_command("line_tracking", "start")
+        return jsonify({"success": success})
+    except Exception as e:
+        print(f"Error in api_line_tracking_start: {e}")
+        return jsonify({"error": "Internal server error"}), 500
 
 @app.route('/api/line-tracking/stop', methods=['POST'])
 def api_line_tracking_stop():
     """Stop line tracking algorithm"""
-    success = send_adafruit_command("line_tracking", "stop")
-    return jsonify({"success": success})
+    try:
+        success = send_adafruit_command("line_tracking", "stop")
+        return jsonify({"success": success})
+    except Exception as e:
+        print(f"Error in api_line_tracking_stop: {e}")
+        return jsonify({"error": "Internal server error"}), 500
 
 @app.route('/api/obstacle-avoidance/start', methods=['POST'])
 def api_obstacle_avoidance_start():
     """Start obstacle avoidance algorithm"""
-    success = send_adafruit_command("obstacle_avoidance", "start")
-    return jsonify({"success": success})
+    try:
+        success = send_adafruit_command("obstacle_avoidance", "start")
+        return jsonify({"success": success})
+    except Exception as e:
+        print(f"Error in api_obstacle_avoidance_start: {e}")
+        return jsonify({"error": "Internal server error"}), 500
 
 @app.route('/api/obstacle-avoidance/stop', methods=['POST'])
 def api_obstacle_avoidance_stop():
     """Stop obstacle avoidance algorithm"""
-    success = send_adafruit_command("obstacle_avoidance", "stop")
-    return jsonify({"success": success})
+    try:
+        success = send_adafruit_command("obstacle_avoidance", "stop")
+        return jsonify({"success": success})
+    except Exception as e:
+        print(f"Error in api_obstacle_avoidance_stop: {e}")
+        return jsonify({"error": "Internal server error"}), 500
 
 def start_sync_worker():
     """Start background thread for database sync"""

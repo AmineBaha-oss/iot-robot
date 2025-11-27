@@ -105,8 +105,8 @@ class SmartLED:
                 self.impl.led_begin(bus=0, device=0)
                 self.impl.set_led_count(self.count)
                 self.set_all(0,0,0)
-            except Exception:
-                self.impl = None
+        except Exception:
+            self.impl = None
 
     def set_all(self, r, g, b):
         if not self.impl: return

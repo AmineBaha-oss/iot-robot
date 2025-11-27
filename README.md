@@ -4,20 +4,44 @@ IoT Smart Mobile Robot (Raspberry Pi) — Complete IoT system with telemetry, au
 
 > Organized codebase with modular structure: hardware interfaces, server modules, telemetry utilities, Flask web app, and database sync.
 
-
 ![Iot-Robot-Image](https://github.com/user-attachments/assets/b92f23f6-80a3-4ba6-83ea-996ce9e3bfbb)
 
+## Milestone 3 - Submission Information
 
-## Video Demonstration
+### Team Members
 
-https://www.youtube.com/watch?v=mzLmGYfJ0nY
----
+- **Amine Baha** (Student ID: 2332522) — hardware + software
+- **Tamim Afghanyar** — software + testing
 
-## Project Reflection
+### Adafruit IO Dashboard
+
+**Dashboard Link:** [Add your Adafruit IO dashboard link here]
+
+- Live sensor data visualization
+- Real-time graphs for ultrasonic, IR sensors, line state
+- Control feeds for motor, LED, buzzer, line tracking, obstacle avoidance
+
+### Cloud Database (Neon.com)
+
+**Database Link:** [Add your Neon.com project link here]
+
+- PostgreSQL database for historical sensor data
+- Automatic sync from Raspberry Pi local SQLite
+- Queryable via Flask web application
+
+### Video Demonstration
+
+**YouTube Link:** https://www.youtube.com/watch?v=mzLmGYfJ0nY
+
+### Project Reflection
 
 This project represents a comprehensive IoT mobile robot system with autonomous navigation capabilities. One of the most challenging aspects was **configuring the line-following algorithm to be consistent and reliable**. Achieving stable line tracking required extensive tuning of PID parameters, careful calibration of infrared sensors, and implementing pivot modes for handling sharp turns. Balancing responsiveness with stability proved to be a delicate process that required numerous iterations and real-world testing to achieve the desired performance.
 
-The modular architecture of the codebase allows for easy maintenance and future enhancements, with clear separation between hardware interfaces, control logic, and telemetry systems.
+**What worked well:** The modular architecture of the codebase allows for easy maintenance and future enhancements, with clear separation between hardware interfaces, control logic, and telemetry systems. The Flask web application provides a user-friendly interface for remote monitoring and control, and the database sync mechanism ensures data integrity even during internet outages.
+
+**What was hardest:** Integrating the offline data storage with cloud synchronization was challenging, requiring careful handling of connection states and ensuring no data loss during transitions. Additionally, coordinating commands between the Flask app, Adafruit IO, and the Raspberry Pi required precise timing and error handling.
+
+**What we'd improve:** If we had more time, we would implement a more sophisticated dashboard with real-time video streaming, add more sensor types, implement machine learning for improved obstacle avoidance, and add user authentication to the web application for better security.
 
 ---
 
@@ -345,6 +369,7 @@ python3 main.py --terminal
 Modern web interface for remote monitoring and control, deployed on Render.com:
 
 **Features:**
+
 - **6 Pages:** Home Dashboard, About, Sensor Data, Control Car, Line Tracking, Obstacle Avoidance
 - **Live Data:** Real-time sensor readings from Adafruit IO via HTTP
 - **Historical Data:** Chart.js graphs with date selection from cloud database
@@ -353,6 +378,7 @@ Modern web interface for remote monitoring and control, deployed on Render.com:
 - **Database Sync:** Local SQLite for offline storage, automatic sync to Neon.com PostgreSQL
 
 **Local Development:**
+
 ```bash
 # Install Flask dependencies
 pip install -r requirements.txt
@@ -363,6 +389,7 @@ python app.py
 ```
 
 **Deployment to Render.com:**
+
 1. Push code to GitHub
 2. Create Web Service on Render.com
 3. Set environment variables:
@@ -382,6 +409,7 @@ python3 command_listener.py
 ```
 
 This script subscribes to control feeds and executes commands:
+
 - Motor control (forward, backward, left, right, stop)
 - LED control (on, off)
 - Buzzer control (on, off)
@@ -403,12 +431,14 @@ This script subscribes to control feeds and executes commands:
 Create a dashboard and add widgets for these feeds:
 
 **Sensor Feeds (for monitoring):**
+
 - `line-ir-left`, `line-ir-center`, `line-ir-right` (0/1)
 - `line-state` (e.g., `L`, `M`, `R`, `LM`, `LR`, `LMR`, `___`)
 - `ultra-distance` (cm)
 - `cam-status` (online/offline); optional `cam-thumb` (base64 jpg)
 
 **Control Feeds (for web app commands):**
+
 - `motor-control` (forward, backward, left, right, stop)
 - `led-control` (on, off)
 - `buzzer-control` (on, off)
@@ -435,6 +465,7 @@ Timestamps are local **ISO 8601** format.
 ```
 
 **Database Storage:**
+
 - **Local SQLite:** `db/robot_telemetry.db` - Stores data when offline
 - **Cloud PostgreSQL:** Neon.com - Historical data storage
 - **Auto-sync:** Background worker syncs local DB to cloud every 5 minutes
@@ -492,7 +523,6 @@ python app.py                   # Run Flask app locally
 ```
 
 ---
-
 
 ---
 

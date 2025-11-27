@@ -7,6 +7,8 @@ import json
 import os
 import sys
 import time
+import signal
+import subprocess
 import paho.mqtt.client as mqtt
 from pathlib import Path
 
@@ -86,11 +88,27 @@ def on_message(client, userdata, msg):
     except Exception as e:
         print(f"Error processing message: {e}")
 
+# Global car instance (reused)
+_car_instance = None
+
+def get_car():
+    """Get or create car instance (singleton)"""
+    global _car_instance
+    if _car_instance is None:
+        try:
+            from hardware.motor import Ordinary_Car
+            _car_instance = Ordinary_Car()
+        except Exception as e:
+            print(f"Error creating car instance: {e}")
+    return _car_instance
+
 def handle_motor_control(action):
     """Handle motor control commands"""
     try:
-        from hardware.motor import Ordinary_Car
-        car = Ordinary_Car()
+        car = get_car()
+        if not car:
+            print("Motor not available")
+            return
         
         speed = 800
         turn_power = 1200
@@ -111,14 +129,29 @@ def handle_motor_control(action):
     except Exception as e:
         print(f"Error controlling motor: {e}")
 
+# Global LED instance (reused)
+_led_instance = None
+
+def get_led():
+    """Get or create LED instance (singleton)"""
+    global _led_instance
+    if _led_instance is None:
+        try:
+            from hardware.spi_ledpixel import Freenove_SPI_LedPixel
+            _led_instance = Freenove_SPI_LedPixel(count=60, bright=120, sequence='GRB', bus=0, device=0)
+            _led_instance.led_begin(bus=0, device=0)
+            _led_instance.set_led_count(60)
+        except Exception as e:
+            print(f"Error creating LED instance: {e}")
+    return _led_instance
+
 def handle_led_control(state):
     """Handle LED control commands"""
     try:
-        # Use SPI LED driver directly (same as car_tui.py)
-        from hardware.spi_ledpixel import Freenove_SPI_LedPixel
-        led = Freenove_SPI_LedPixel(count=60, bright=120, sequence='GRB', bus=0, device=0)
-        led.led_begin(bus=0, device=0)
-        led.set_led_count(60)
+        led = get_led()
+        if not led:
+            print("LED not available")
+            return
         
         if state == "on":
             # Turn on LEDs (white, brightness 200)
@@ -150,25 +183,65 @@ def handle_line_tracking(command):
     """Handle line tracking commands"""
     import subprocess
     BASE_DIR = Path(__file__).resolve().parent
+    PID_FILE = Path("/tmp/line_follow.pid")
     
     if command == "start":
+        # Check if already running
+        if PID_FILE.exists():
+            try:
+                pid = int(PID_FILE.read_text().strip())
+                # Check if process is still running
+                try:
+                    os.kill(pid, 0)  # Signal 0 just checks if process exists
+                    print("Line tracking already running")
+                    return
+                except OSError:
+                    # Process doesn't exist, remove stale PID file
+                    PID_FILE.unlink()
+            except (ValueError, OSError):
+                PID_FILE.unlink()
+        
         # Start line following script
         script = BASE_DIR / "line_follow.py"
-        process = subprocess.Popen(
-            ["python3", str(script)],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True
-        )
-        # Check if it started successfully
-        time.sleep(0.5)
-        if process.poll() is not None:
-            stdout, stderr = process.communicate()
-            print(f"Line tracking failed to start: {stderr}")
-        else:
-            print("Line tracking started")
+        try:
+            process = subprocess.Popen(
+                ["python3", str(script)],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                preexec_fn=os.setsid  # Start in new process group
+            )
+            # Save PID
+            PID_FILE.write_text(str(process.pid))
+            
+            # Check if it started successfully
+            time.sleep(0.5)
+            if process.poll() is not None:
+                stdout, stderr = process.communicate()
+                print(f"Line tracking failed to start: {stderr}")
+                PID_FILE.unlink()
+            else:
+                print("Line tracking started")
+        except Exception as e:
+            print(f"Error starting line tracking: {e}")
+            if PID_FILE.exists():
+                PID_FILE.unlink()
     elif command == "stop":
-        # Stop line following (find and kill process)
+        # Stop line following
+        if PID_FILE.exists():
+            try:
+                pid = int(PID_FILE.read_text().strip())
+                try:
+                    os.killpg(os.getpgid(pid), signal.SIGTERM)  # Kill process group
+                    time.sleep(0.5)
+                    os.killpg(os.getpgid(pid), signal.SIGKILL)  # Force kill if still running
+                except (OSError, ProcessLookupError):
+                    pass
+                PID_FILE.unlink()
+            except (ValueError, OSError):
+                PID_FILE.unlink()
+        
+        # Also try pkill as fallback
         subprocess.run(["pkill", "-f", "line_follow.py"],
                       stdout=subprocess.DEVNULL,
                       stderr=subprocess.DEVNULL)
@@ -176,31 +249,67 @@ def handle_line_tracking(command):
 
 def handle_obstacle_avoidance(command):
     """Handle obstacle avoidance commands"""
-    import subprocess
-    import os
     BASE_DIR = Path(__file__).resolve().parent
+    PID_FILE = Path("/tmp/obstacle_navigator.pid")
     
     if command == "start":
+        # Check if already running
+        if PID_FILE.exists():
+            try:
+                pid = int(PID_FILE.read_text().strip())
+                # Check if process is still running
+                try:
+                    os.kill(pid, 0)  # Signal 0 just checks if process exists
+                    print("Obstacle avoidance already running")
+                    return
+                except OSError:
+                    # Process doesn't exist, remove stale PID file
+                    PID_FILE.unlink()
+            except (ValueError, OSError):
+                PID_FILE.unlink()
+        
         # Start obstacle navigator script
-        # Don't hide errors so we can see what's wrong
         script = BASE_DIR / "obstacle_navigator.py"
-        # Run in background but capture errors
-        process = subprocess.Popen(
-            ["python3", str(script)],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True
-        )
-        # Check if it started successfully (wait a bit to see if it crashes immediately)
-        time.sleep(0.5)
-        if process.poll() is not None:
-            # Process already exited (crashed)
-            stdout, stderr = process.communicate()
-            print(f"Obstacle avoidance failed to start: {stderr}")
-        else:
-            print("Obstacle avoidance started")
+        try:
+            process = subprocess.Popen(
+                ["python3", str(script)],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                preexec_fn=os.setsid  # Start in new process group
+            )
+            # Save PID
+            PID_FILE.write_text(str(process.pid))
+            
+            # Check if it started successfully (wait a bit to see if it crashes immediately)
+            time.sleep(0.5)
+            if process.poll() is not None:
+                # Process already exited (crashed)
+                stdout, stderr = process.communicate()
+                print(f"Obstacle avoidance failed to start: {stderr}")
+                PID_FILE.unlink()
+            else:
+                print("Obstacle avoidance started")
+        except Exception as e:
+            print(f"Error starting obstacle avoidance: {e}")
+            if PID_FILE.exists():
+                PID_FILE.unlink()
     elif command == "stop":
         # Stop obstacle navigator
+        if PID_FILE.exists():
+            try:
+                pid = int(PID_FILE.read_text().strip())
+                try:
+                    os.killpg(os.getpgid(pid), signal.SIGTERM)  # Kill process group
+                    time.sleep(0.5)
+                    os.killpg(os.getpgid(pid), signal.SIGKILL)  # Force kill if still running
+                except (OSError, ProcessLookupError):
+                    pass
+                PID_FILE.unlink()
+            except (ValueError, OSError):
+                PID_FILE.unlink()
+        
+        # Also try pkill as fallback
         subprocess.run(["pkill", "-f", "obstacle_navigator.py"], 
                       stdout=subprocess.DEVNULL, 
                       stderr=subprocess.DEVNULL)

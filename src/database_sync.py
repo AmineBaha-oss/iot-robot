@@ -86,6 +86,35 @@ def mark_as_synced(record_ids):
         print(f"Error marking as synced: {e}")
         return False
 
+def get_cloud_connection():
+    """Get connection to cloud database with proper error handling"""
+    cloud_db_url = os.environ.get("DATABASE_URL", "")
+    if not cloud_db_url:
+        return None, "No DATABASE_URL set"
+    
+    try:
+        # Parse connection string and ensure SSL is properly configured
+        # Neon.com requires SSL connections
+        # Check if sslmode is already in the URL
+        if "sslmode" not in cloud_db_url.lower():
+            # Add sslmode if not present
+            separator = "&" if "?" in cloud_db_url else "?"
+            cloud_db_url = f"{cloud_db_url}{separator}sslmode=require"
+        
+        # Connect with timeout
+        # Note: sslmode in connection string takes precedence over parameter
+        conn = psycopg2.connect(
+            cloud_db_url,
+            connect_timeout=10
+        )
+        return conn, None
+    except psycopg2.OperationalError as e:
+        return None, f"Connection error: {e}"
+    except psycopg2.Error as e:
+        return None, f"Database error: {e}"
+    except Exception as e:
+        return None, f"Unexpected error: {e}"
+
 def sync_to_cloud():
     """Sync unsynced records to cloud database (Neon.com)"""
     cloud_db_url = os.environ.get("DATABASE_URL", "")
@@ -97,12 +126,15 @@ def sync_to_cloud():
     if not unsynced:
         return True
     
+    conn, error = get_cloud_connection()
+    if conn is None:
+        print(f"Failed to connect to cloud database: {error}")
+        return False
+    
     try:
-        # Connect to cloud database
-        conn = psycopg2.connect(cloud_db_url)
         c = conn.cursor()
         
-        # Ensure table exists
+        # Ensure table exists with proper schema
         c.execute('''
             CREATE TABLE IF NOT EXISTS sensor_data (
                 id SERIAL PRIMARY KEY,
@@ -115,27 +147,111 @@ def sync_to_cloud():
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         ''')
+        
+        # Create unique constraint for ON CONFLICT to work
+        # Check if constraint already exists
+        c.execute('''
+            SELECT 1 FROM pg_constraint 
+            WHERE conname = 'sensor_data_unique'
+        ''')
+        constraint_exists = c.fetchone()
+        
+        if not constraint_exists:
+            try:
+                # Create unique constraint
+                c.execute('''
+                    ALTER TABLE sensor_data 
+                    ADD CONSTRAINT sensor_data_unique 
+                    UNIQUE (timestamp, ultrasonic_cm, ir_left, ir_center, ir_right, line_state)
+                ''')
+            except Exception as e:
+                # If constraint creation fails (e.g., duplicates exist), create unique index instead
+                try:
+                    c.execute('''
+                        CREATE UNIQUE INDEX IF NOT EXISTS sensor_data_unique_idx 
+                        ON sensor_data (timestamp, ultrasonic_cm, ir_left, ir_center, ir_right, line_state)
+                    ''')
+                except Exception:
+                    pass  # Index might already exist
+        
         conn.commit()
         
-        # Insert unsynced records
-        records = [(r[1], r[2], r[3], r[4], r[5], r[6]) for r in unsynced]
-        execute_values(
-            c,
-            '''INSERT INTO sensor_data (timestamp, ultrasonic_cm, ir_left, ir_center, ir_right, line_state)
-               VALUES %s ON CONFLICT DO NOTHING''',
-            records
-        )
+        # Insert unsynced records (skip duplicates)
+        # Convert SQLite timestamp strings to PostgreSQL TIMESTAMP
+        records = []
+        for r in unsynced:
+            try:
+                # Parse timestamp string to datetime object
+                timestamp_str = r[1]  # timestamp is at index 1
+                if isinstance(timestamp_str, str):
+                    # Try to parse ISO format timestamp
+                    dt = datetime.fromisoformat(timestamp_str.replace('Z', '+00:00'))
+                else:
+                    dt = timestamp_str
+                
+                records.append((
+                    dt,
+                    r[2] if r[2] is not None else None,  # ultrasonic_cm
+                    r[3] if r[3] is not None else None,  # ir_left
+                    r[4] if r[4] is not None else None,  # ir_center
+                    r[5] if r[5] is not None else None,  # ir_right
+                    r[6] if r[6] else None  # line_state
+                ))
+            except Exception as e:
+                print(f"Warning: Skipping record {r[0]} due to timestamp error: {e}")
+                continue
+        
+        if not records:
+            conn.close()
+            return True
+        
+        # Use ON CONFLICT - try constraint name first, then column list
+        try:
+            # Try with constraint name first
+            execute_values(
+                c,
+                '''INSERT INTO sensor_data (timestamp, ultrasonic_cm, ir_left, ir_center, ir_right, line_state)
+                   VALUES %s 
+                   ON CONFLICT ON CONSTRAINT sensor_data_unique 
+                   DO NOTHING''',
+                records
+            )
+        except Exception as e1:
+            # Fallback: use column list (works with unique index too)
+            # This handles cases where constraint doesn't exist or has different name
+            try:
+                execute_values(
+                    c,
+                    '''INSERT INTO sensor_data (timestamp, ultrasonic_cm, ir_left, ir_center, ir_right, line_state)
+                       VALUES %s 
+                       ON CONFLICT (timestamp, ultrasonic_cm, ir_left, ir_center, ir_right, line_state) 
+                       DO NOTHING''',
+                    records
+                )
+            except Exception as e2:
+                print(f"Error inserting records (constraint): {e1}")
+                print(f"Error inserting records (column list): {e2}")
+                conn.rollback()
+                conn.close()
+                return False
+        
         conn.commit()
         conn.close()
         
-        # Mark as synced
-        record_ids = [r[0] for r in unsynced]
-        mark_as_synced(record_ids)
+        # Mark as synced only if insert was successful
+        record_ids = [r[0] for r in unsynced[:len(records)]]
+        if record_ids:
+            mark_as_synced(record_ids)
         
-        print(f"Synced {len(unsynced)} records to cloud")
+        print(f"Synced {len(records)} records to cloud")
         return True
     except Exception as e:
         print(f"Error syncing to cloud: {e}")
+        try:
+            conn.rollback()
+            conn.close()
+        except:
+            pass
         return False
 
 def check_internet():
