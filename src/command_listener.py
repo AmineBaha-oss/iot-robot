@@ -89,20 +89,21 @@ def on_message(client, userdata, msg):
 def handle_motor_control(action):
     """Handle motor control commands"""
     try:
-        from motor import Ordinary_Car
+        from hardware.motor import Ordinary_Car
         car = Ordinary_Car()
         
         speed = 800
         turn_power = 1200
+        drive_sign = -1  # Match car_tui.py behavior
         
         if action == "forward":
-            car.set_motor_model(speed, speed, speed, speed)
+            car.set_motor_model(int(speed)*drive_sign, int(speed)*drive_sign, int(speed)*drive_sign, int(speed)*drive_sign)
         elif action == "backward":
-            car.set_motor_model(-speed, -speed, -speed, -speed)
+            car.set_motor_model(-int(speed)*drive_sign, -int(speed)*drive_sign, -int(speed)*drive_sign, -int(speed)*drive_sign)
         elif action == "left":
-            car.set_motor_model(-turn_power, -turn_power, turn_power, turn_power)
+            car.set_motor_model(-int(turn_power)*drive_sign, -int(turn_power)*drive_sign, +int(turn_power)*drive_sign, +int(turn_power)*drive_sign)
         elif action == "right":
-            car.set_motor_model(turn_power, turn_power, -turn_power, -turn_power)
+            car.set_motor_model(+int(turn_power)*drive_sign, +int(turn_power)*drive_sign, -int(turn_power)*drive_sign, -int(turn_power)*drive_sign)
         elif action == "stop":
             car.set_motor_model(0, 0, 0, 0)
         
@@ -113,18 +114,18 @@ def handle_motor_control(action):
 def handle_led_control(state):
     """Handle LED control commands"""
     try:
-        from hardware.led import Led
-        led = Led()
+        # Use SPI LED driver directly (same as car_tui.py)
+        from hardware.spi_ledpixel import Freenove_SPI_LedPixel
+        led = Freenove_SPI_LedPixel(count=60, bright=120, sequence='GRB', bus=0, device=0)
+        led.led_begin(bus=0, device=0)
+        led.set_led_count(60)
         
         if state == "on":
-            # Turn on LEDs (white)
-            for i in range(led.strip.get_led_count()):
-                led.strip.set_led_rgb_data(i, [255, 255, 255])
-            led.strip.show()
+            # Turn on LEDs (white, brightness 200)
+            led.set_all_led_color(200, 200, 200)
         elif state == "off":
             # Turn off LEDs
-            led.strip.set_all_led_color(0, 0, 0)
-            led.strip.show()
+            led.set_all_led_color(0, 0, 0)
         
         print(f"LED control: {state}")
     except Exception as e:
