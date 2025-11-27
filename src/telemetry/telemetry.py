@@ -1,10 +1,19 @@
 #!/usr/bin/env python3
-import os, json, time, base64, datetime, csv, ssl
+import os, json, time, base64, datetime, csv, ssl, sys
 from pathlib import Path
 from typing import Optional
 import paho.mqtt.client as mqtt
 
 BASE = Path(__file__).resolve().parent
+
+# Import database sync functions
+try:
+    import sys
+    sys.path.insert(0, str(BASE.parent))
+    from database_sync import save_to_local_db, sync_to_cloud, check_internet, init_local_db
+    DB_AVAILABLE = True
+except ImportError:
+    DB_AVAILABLE = False
 
 # Cache files written by car_tui.py and line_follow.py
 IR_CACHE    = Path("/tmp/ir_lmr.txt")     # "L M R" as three ints
@@ -175,10 +184,15 @@ class Telemetry:
         self.dt_ir  = intervals["infrared_sec"]
         self.dt_us  = intervals["ultrasonic_sec"]
         self.dt_cam = intervals["camera_sec"]
-        self.t_ir = self.t_us = self.t_cam = 0.0
+        self.t_ir = self.t_us = self.t_cam = self.t_sync = 0.0
         self.cam = CamReader() if (os.environ.get("TELEM_SKIP_CAM") != "1") else None
         self.log = CsvLogger(BASE / log_cfg.get("path","logs/telemetry.csv")) if log_cfg.get("enabled",True) else None
         self.stop = False
+        
+        # Initialize database if available
+        if DB_AVAILABLE:
+            init_local_db()
+            print("[telemetry] database initialized (local SQLite + cloud sync)")
 
     def loop(self):
         print("[telemetry] (cache-only, TLS) started. Ctrl+C to stop.")
@@ -192,6 +206,10 @@ class Telemetry:
                     d = read_ultra_cached()
                     if d is not None:
                         self.pub.pub(self.feeds["ultrasonic_cm"], f"{d:.1f}")
+                        # Save to local database
+                        if DB_AVAILABLE:
+                            timestamp = datetime.datetime.now().isoformat()
+                            save_to_local_db(timestamp=timestamp, ultrasonic=float(d))
 
                 # Infrared from cache
                 if t - self.t_ir >= self.dt_ir:
@@ -204,6 +222,18 @@ class Telemetry:
                         self.pub.pub(self.feeds["ir_right"],  R)
                         line_state = f"{'L' if L else '_'}{'M' if M else '_'}{'R' if R else '_'}"
                         self.pub.pub(self.feeds["line_state"], line_state)
+                        # Save to local database
+                        if DB_AVAILABLE:
+                            timestamp = datetime.datetime.now().isoformat()
+                            d = read_ultra_cached()
+                            save_to_local_db(
+                                timestamp=timestamp,
+                                ultrasonic=float(d) if d is not None else None,
+                                ir_left=int(L) if L is not None else None,
+                                ir_center=int(M) if M is not None else None,
+                                ir_right=int(R) if R is not None else None,
+                                line_state=line_state if line_state else None
+                            )
 
                 # Camera (optional, non-GPIO)
                 if t - self.t_cam >= self.dt_cam:
@@ -222,6 +252,13 @@ class Telemetry:
                     if v: L,M,R = v; line_state = f"{'L' if L else '_'}{'M' if M else '_'}{'R' if R else '_'}"
                     else: L=M=R=""; line_state="___"
                     self.log.log(d, L, M, R, line_state, (self.cam.status() if self.cam else "offline"))
+
+                # Sync local database to cloud every 5 minutes (300 seconds)
+                if DB_AVAILABLE and (t - self.t_sync >= 300):
+                    self.t_sync = t
+                    if check_internet():
+                        sync_to_cloud()
+                        print("[telemetry] synced local database to cloud", file=sys.stderr)
 
                 time.sleep(0.05)
         except KeyboardInterrupt:

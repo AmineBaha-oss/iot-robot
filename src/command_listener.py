@@ -154,30 +154,56 @@ def handle_line_tracking(command):
     if command == "start":
         # Start line following script
         script = BASE_DIR / "line_follow.py"
-        subprocess.Popen(["python3", str(script)], 
-                        stdout=subprocess.DEVNULL, 
-                        stderr=subprocess.DEVNULL)
-        print("Line tracking started")
+        process = subprocess.Popen(
+            ["python3", str(script)],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True
+        )
+        # Check if it started successfully
+        time.sleep(0.5)
+        if process.poll() is not None:
+            stdout, stderr = process.communicate()
+            print(f"Line tracking failed to start: {stderr}")
+        else:
+            print("Line tracking started")
     elif command == "stop":
         # Stop line following (find and kill process)
-        subprocess.run(["pkill", "-f", "line_follow.py"])
+        subprocess.run(["pkill", "-f", "line_follow.py"],
+                      stdout=subprocess.DEVNULL,
+                      stderr=subprocess.DEVNULL)
         print("Line tracking stopped")
 
 def handle_obstacle_avoidance(command):
     """Handle obstacle avoidance commands"""
     import subprocess
+    import os
     BASE_DIR = Path(__file__).resolve().parent
     
     if command == "start":
         # Start obstacle navigator script
+        # Don't hide errors so we can see what's wrong
         script = BASE_DIR / "obstacle_navigator.py"
-        subprocess.Popen(["python3", str(script)],
-                        stdout=subprocess.DEVNULL,
-                        stderr=subprocess.DEVNULL)
-        print("Obstacle avoidance started")
+        # Run in background but capture errors
+        process = subprocess.Popen(
+            ["python3", str(script)],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True
+        )
+        # Check if it started successfully (wait a bit to see if it crashes immediately)
+        time.sleep(0.5)
+        if process.poll() is not None:
+            # Process already exited (crashed)
+            stdout, stderr = process.communicate()
+            print(f"Obstacle avoidance failed to start: {stderr}")
+        else:
+            print("Obstacle avoidance started")
     elif command == "stop":
         # Stop obstacle navigator
-        subprocess.run(["pkill", "-f", "obstacle_navigator.py"])
+        subprocess.run(["pkill", "-f", "obstacle_navigator.py"], 
+                      stdout=subprocess.DEVNULL, 
+                      stderr=subprocess.DEVNULL)
         print("Obstacle avoidance stopped")
 
 def main():
