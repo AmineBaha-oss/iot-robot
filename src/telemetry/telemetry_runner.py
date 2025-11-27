@@ -41,3 +41,11 @@ if __name__ == "__main__":
     spec = importlib.util.spec_from_file_location("telemetry", str(BASE / "telemetry.py"))
     telem = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(telem)
+    
+    # Actually start the telemetry loop (since __name__ != "__main__" when imported)
+    if hasattr(telem, "Telemetry"):
+        print(f"[telemetry-runner] Starting telemetry with config: {CFG_PATH}")
+        telem.Telemetry(cfg).loop()
+    else:
+        print("[telemetry-runner] Error: Telemetry class not found in telemetry.py", file=sys.stderr)
+        sys.exit(1)
