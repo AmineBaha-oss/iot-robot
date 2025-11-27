@@ -13,14 +13,14 @@ import requests
 from threading import Thread
 import time
 import sys
-sys.path.insert(0, str(BASE_DIR / "src"))
-from database_sync import save_to_local_db, sync_to_cloud, check_internet
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev-secret-key-change-in-production')
 
 # Configuration paths
 BASE_DIR = Path(__file__).parent
+sys.path.insert(0, str(BASE_DIR / "src"))
+from database_sync import save_to_local_db, sync_to_cloud, check_internet
 CONFIG_DIR = BASE_DIR / "config"
 DATA_DIR = BASE_DIR / "data"
 DB_DIR = BASE_DIR / "db"
