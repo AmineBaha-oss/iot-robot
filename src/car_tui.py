@@ -22,9 +22,10 @@ def _clear_caches():
 # ---------------- Car (motors) ----------------
 car = None
 try:
-    from motor import Ordinary_Car
+    from hardware.motor import Ordinary_Car
     car = Ordinary_Car()
-except Exception:
+except Exception as e:
+    print(f"[MOTOR] Failed to load: {e}", file=sys.stderr)
     car = None
 
 # ---------------- Buzzer ----------------
@@ -32,9 +33,10 @@ class SmartBuzzer:
     def __init__(self):
         self.b = None
         try:
-            from buzzer import Buzzer
+            from hardware.buzzer import Buzzer
             self.b = Buzzer()
-        except Exception:
+        except Exception as e:
+            print(f"[BUZZER] Failed to load: {e}", file=sys.stderr)
             self.b = None
     def _call(self, name, *a):
         if not self.b: return False
@@ -63,9 +65,12 @@ class SmartLED:
         self.count    = int(os.environ.get("LED_COUNT", "60"))
         self.bright   = int(os.environ.get("LED_BRIGHT", "120"))
         self.sequence = os.environ.get("LED_SEQUENCE", "GRB")
-        # params.json overrides
+        # params.json overrides (check parent directory first, then current)
         try:
-            cfg = json.load(open(os.path.join(BASE, "params.json")))
+            params_path = os.path.join(os.path.dirname(BASE), "params.json")
+            if not os.path.exists(params_path):
+                params_path = os.path.join(BASE, "params.json")
+            cfg = json.load(open(params_path))
             self.count    = int(cfg.get("Led_Count", self.count))
             self.bright   = int(cfg.get("Led_Brightness", cfg.get("Led_Bright", self.bright)))
             self.sequence = str(cfg.get("Led_Sequence", self.sequence))
@@ -80,13 +85,19 @@ class SmartLED:
             import repo.src.Server.spi_ledpixel as mod
             self.driver_path = getattr(mod, "__file__", "repo/src/Server/spi_ledpixel.py")
         except Exception:
-            # fallback to top-level
+            # fallback to hardware module
             try:
-                from spi_ledpixel import Freenove_SPI_LedPixel as LED
-                import spi_ledpixel as mod
-                self.driver_path = getattr(mod, "__file__", "spi_ledpixel.py")
+                from hardware.spi_ledpixel import Freenove_SPI_LedPixel as LED
+                import hardware.spi_ledpixel as mod
+                self.driver_path = getattr(mod, "__file__", "hardware/spi_ledpixel.py")
             except Exception:
-                LED = None
+                # fallback to top-level
+                try:
+                    from spi_ledpixel import Freenove_SPI_LedPixel as LED
+                    import spi_ledpixel as mod
+                    self.driver_path = getattr(mod, "__file__", "spi_ledpixel.py")
+                except Exception:
+                    LED = None
 
         if LED is not None:
             try:
@@ -117,7 +128,7 @@ leds = SmartLED()
 # ---------------- Servos (pan/tilt) ----------------
 pan = tilt = None
 try:
-    from servo import Servo
+    from hardware.servo import Servo
     _servo = Servo()
     def set_servo_angle(ch: str, deg: int):
         for name in ("set_servo_angle","setServoAngle","set_servo_pwm","setServoPwm"):
@@ -130,15 +141,17 @@ try:
         raise RuntimeError("No supported servo setter")
     set_servo_angle("0", 90); set_servo_angle("1", 90)
     pan = object(); tilt = object()
-except Exception:
+except Exception as e:
+    print(f"[SERVO] Failed to load: {e}", file=sys.stderr)
     pan = tilt = None
 
 # ---------------- Ultrasonic ----------------
 Ultrasonic = None
 try:
-    from ultrasonic import Ultrasonic as _U
+    from hardware.ultrasonic import Ultrasonic as _U
     Ultrasonic = _U
-except Exception:
+except Exception as e:
+    print(f"[ULTRASONIC] Failed to load: {e}", file=sys.stderr)
     Ultrasonic = None
 
 # ---------------- Process mgmt ----------------
