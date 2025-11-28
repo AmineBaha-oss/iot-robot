@@ -139,8 +139,36 @@ def get_infrared():
             print(f"[sensor_cache] Error creating IR sensors: {e}")
     return _infrared_instance
 
+def is_algorithm_running():
+    """Check if line tracking or obstacle avoidance is running"""
+    line_tracking_pid = Path("/tmp/line_follow.pid")
+    obstacle_pid = Path("/tmp/obstacle_navigator.pid")
+    
+    # Check line tracking
+    if line_tracking_pid.exists():
+        try:
+            pid = int(line_tracking_pid.read_text().strip())
+            os.kill(pid, 0)  # Signal 0 just checks if process exists
+            return True  # Line tracking is running
+        except (OSError, ValueError):
+            pass
+    
+    # Check obstacle avoidance
+    if obstacle_pid.exists():
+        try:
+            pid = int(obstacle_pid.read_text().strip())
+            os.kill(pid, 0)  # Signal 0 just checks if process exists
+            return True  # Obstacle avoidance is running
+        except (OSError, ValueError):
+            pass
+    
+    return False  # No algorithms running
+
 def write_sensor_cache():
-    """Continuously read sensors and write to cache files"""
+    """Continuously read sensors and write to cache files
+    Only reads GPIO when algorithms are NOT running (to avoid conflicts)
+    When algorithms ARE running, they write to cache themselves
+    """
     global _sensor_thread_running
     
     ultrasonic = get_ultrasonic()
@@ -151,6 +179,7 @@ def write_sensor_cache():
         return
     
     print("[sensor_cache] Starting sensor cache writer thread...")
+    print("[sensor_cache] Will read GPIO only when algorithms are NOT running")
     _sensor_thread_running = True
     
     last_ultra_time = 0
@@ -162,29 +191,53 @@ def write_sensor_cache():
         try:
             t = time.time()
             
-            # Read and write ultrasonic sensor
-            if t - last_ultra_time >= ultra_interval:
-                try:
-                    distance = ultrasonic.get_distance()
-                    if distance is not None and distance > 0 and distance <= 400:
-                        ULTRA_CACHE.write_text(f"{distance:.1f}")
-                        last_ultra_time = t
-                except Exception as e:
-                    # GPIO might be busy, skip this cycle
-                    pass
+            # Check if algorithms are running (they write to cache themselves)
+            algorithms_running = is_algorithm_running()
             
-            # Read and write IR sensors
-            if t - last_ir_time >= ir_interval:
-                try:
-                    L = infrared.read_one_infrared(1)  # Channel 1 = Left
-                    M = infrared.read_one_infrared(2)  # Channel 2 = Center
-                    R = infrared.read_one_infrared(3)  # Channel 3 = Right
-                    # Write in format: "L M R" (space-separated)
-                    IR_CACHE.write_text(f"{int(L)} {int(M)} {int(R)}")
+            if not algorithms_running:
+                # No algorithms running - we can safely read GPIO and write to cache
+                
+                # Read and write ultrasonic sensor
+                if t - last_ultra_time >= ultra_interval:
+                    try:
+                        distance = ultrasonic.get_distance()
+                        if distance is not None and distance > 0 and distance <= 400:
+                            ULTRA_CACHE.write_text(f"{distance:.1f}")
+                            last_ultra_time = t
+                    except Exception as e:
+                        # GPIO might be busy, skip this cycle
+                        pass
+                
+                # Read and write IR sensors
+                if t - last_ir_time >= ir_interval:
+                    try:
+                        L = infrared.read_one_infrared(1)  # Channel 1 = Left
+                        M = infrared.read_one_infrared(2)  # Channel 2 = Center
+                        R = infrared.read_one_infrared(3)  # Channel 3 = Right
+                        # Write in format: "L M R" (space-separated)
+                        IR_CACHE.write_text(f"{int(L)} {int(M)} {int(R)}")
+                        last_ir_time = t
+                    except Exception as e:
+                        # GPIO might be busy, skip this cycle
+                        pass
+            else:
+                # Algorithms are running - they write to cache themselves
+                # Just check cache files are being updated (for monitoring)
+                if t - last_ultra_time >= 1.0:  # Check every second
+                    if ULTRA_CACHE.exists():
+                        mtime = ULTRA_CACHE.stat().st_mtime
+                        age = t - mtime
+                        if age > 3.0:
+                            print(f"[sensor_cache] Warning: Ultrasonic cache not updated in {age:.1f}s")
+                    last_ultra_time = t
+                
+                if t - last_ir_time >= 1.0:  # Check every second
+                    if IR_CACHE.exists():
+                        mtime = IR_CACHE.stat().st_mtime
+                        age = t - mtime
+                        if age > 3.0:
+                            print(f"[sensor_cache] Warning: IR cache not updated in {age:.1f}s")
                     last_ir_time = t
-                except Exception as e:
-                    # GPIO might be busy, skip this cycle
-                    pass
             
             time.sleep(0.05)  # Small delay to prevent CPU overload
             
