@@ -5,6 +5,7 @@ from typing import Optional
 import paho.mqtt.client as mqtt
 
 BASE = Path(__file__).resolve().parent
+PROJECT_ROOT = BASE.parent.parent  # Go up to project root
 
 # Import database sync functions
 try:
@@ -35,7 +36,13 @@ def load_cfg():
     if override_path and Path(override_path).exists():
         cfg = json.loads(Path(override_path).read_text())
     else:
-        cfg = json.loads((BASE/"adafruit.json").read_text())
+        # Try config/adafruit.json in project root
+        config_path = PROJECT_ROOT / "config" / "adafruit.json"
+        if config_path.exists():
+            cfg = json.loads(config_path.read_text())
+        else:
+            # Fallback to old location
+            cfg = json.loads((BASE/"adafruit.json").read_text())
     a = cfg["adafruit"] if "adafruit" in cfg else cfg
     username = a.get("username") or a.get("user")
     key      = a.get("key") or a.get("aio_key")
@@ -281,5 +288,11 @@ class Telemetry:
             self.pub.close()
 
 if __name__ == "__main__":
-    cfg = json.load(open(BASE/"adafruit.json"))
+    # Load config from project root
+    config_path = PROJECT_ROOT / "config" / "adafruit.json"
+    if config_path.exists():
+        cfg = json.load(open(config_path))
+    else:
+        # Fallback to old location
+        cfg = json.load(open(BASE/"adafruit.json"))
     Telemetry(cfg).loop()

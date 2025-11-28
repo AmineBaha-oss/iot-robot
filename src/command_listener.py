@@ -601,6 +601,8 @@ def handle_obstacle_avoidance(command):
 
 def main():
     """Main function"""
+    global _sensor_thread_running
+    
     # Start sensor cache writer thread (reads sensors and writes to cache files)
     print("[command_listener] Starting sensor cache writer...")
     cache_thread = start_sensor_cache_writer()
@@ -618,7 +620,6 @@ def main():
         client.loop_forever()
     except KeyboardInterrupt:
         print("\n[command_listener] Shutting down...")
-        global _sensor_thread_running
         _sensor_thread_running = False
         time.sleep(0.5)  # Give cache thread time to stop
         client.disconnect()
@@ -636,7 +637,6 @@ def main():
                 pass
     except Exception as e:
         print(f"[command_listener] Error: {e}")
-        global _sensor_thread_running
         _sensor_thread_running = False
 
 if __name__ == "__main__":
