@@ -1,6 +1,5 @@
-{% extends "base.html" %} 
-{% block title %}Sensors - ROBOCAR X1{% endblock %} 
-{% block content %}
+{% extends "base.html" %} {% block title %}Sensors - YVLSWITCH{% endblock %} {%
+block content %}
 <div class="container">
   <h1 class="page-title">Sensor Data</h1>
 
@@ -12,8 +11,12 @@
       <div class="date-selector">
         <label for="date-input">Select Date:</label>
         <input type="date" id="date-input" value="" />
-        <button class="btn btn-primary" onclick="loadHistoricalData()">Load Data</button>
-        <button class="btn btn-secondary" onclick="loadAllData()">Load All</button>
+        <button class="btn btn-primary" onclick="loadHistoricalData()">
+          Load Data
+        </button>
+        <button class="btn btn-secondary" onclick="loadAllData()">
+          Load All
+        </button>
       </div>
     </div>
   </div>
@@ -56,19 +59,17 @@
     </div>
   </div>
 </div>
-{% endblock %} 
-
-{% block scripts %}
+{% endblock %} {% block scripts %}
 <script>
   let charts = {};
 
   // Cyberpunk theme colors
-  const neonCyan = '#00f5ff';
-  const neonPink = '#ff00ff';
-  const neonGreen = '#39ff14';
-  const neonOrange = '#ff6b35';
-  const darkBg = '#0a0a0f';
-  const textSecondary = '#8892b0';
+  const neonCyan = "#00f5ff";
+  const neonPink = "#ff00ff";
+  const neonGreen = "#39ff14";
+  const neonOrange = "#ff6b35";
+  const darkBg = "#0a0a0f";
+  const textSecondary = "#8892b0";
 
   function initCharts() {
     // Common chart options with cyberpunk styling
@@ -79,127 +80,138 @@
         legend: {
           labels: {
             color: textSecondary,
-            font: { family: 'Orbitron', size: 12 }
-          }
-        }
+            font: { family: "Orbitron", size: 12 },
+          },
+        },
       },
       scales: {
         y: {
           beginAtZero: true,
           grid: {
-            color: 'rgba(0, 245, 255, 0.1)',
-            drawBorder: false
+            color: "rgba(0, 245, 255, 0.1)",
+            drawBorder: false,
           },
           ticks: {
             color: textSecondary,
-            font: { family: 'Rajdhani', size: 11 }
-          }
+            font: { family: "Rajdhani", size: 11 },
+          },
         },
         x: {
           grid: {
-            color: 'rgba(0, 245, 255, 0.05)',
-            drawBorder: false
+            color: "rgba(0, 245, 255, 0.05)",
+            drawBorder: false,
           },
           ticks: {
             color: textSecondary,
-            font: { family: 'Rajdhani', size: 10 },
+            font: { family: "Rajdhani", size: 10 },
             maxRotation: 45,
-            minRotation: 45
-          }
-        }
-      }
+            minRotation: 45,
+          },
+        },
+      },
     };
 
     charts.ultrasonic = new Chart(document.getElementById("ultrasonic-chart"), {
       type: "line",
       data: {
         labels: [],
-        datasets: [{
-          label: "Distance (cm)",
-          data: [],
-          borderColor: neonCyan,
-          backgroundColor: 'rgba(0, 245, 255, 0.1)',
-          borderWidth: 3,
-          pointBackgroundColor: neonCyan,
-          pointBorderColor: neonCyan,
-          pointRadius: 4,
-          pointHoverRadius: 6,
-          tension: 0.3,
-          fill: true
-        }]
+        datasets: [
+          {
+            label: "Distance (cm)",
+            data: [],
+            borderColor: neonCyan,
+            backgroundColor: "rgba(0, 245, 255, 0.1)",
+            borderWidth: 3,
+            pointBackgroundColor: neonCyan,
+            pointBorderColor: neonCyan,
+            pointRadius: 4,
+            pointHoverRadius: 6,
+            tension: 0.3,
+            fill: true,
+          },
+        ],
       },
-      options: chartOptions
+      options: chartOptions,
     });
 
     charts.irLeft = new Chart(document.getElementById("ir-left-chart"), {
       type: "line",
       data: {
         labels: [],
-        datasets: [{
-          label: "IR Left",
-          data: [],
-          borderColor: neonPink,
-          backgroundColor: 'rgba(255, 0, 255, 0.1)',
-          borderWidth: 3,
-          pointBackgroundColor: neonPink,
-          pointBorderColor: neonPink,
-          pointRadius: 4,
-          pointHoverRadius: 6,
-          tension: 0.3,
-          fill: true
-        }]
+        datasets: [
+          {
+            label: "IR Left",
+            data: [],
+            borderColor: neonPink,
+            backgroundColor: "rgba(255, 0, 255, 0.1)",
+            borderWidth: 3,
+            pointBackgroundColor: neonPink,
+            pointBorderColor: neonPink,
+            pointRadius: 4,
+            pointHoverRadius: 6,
+            tension: 0.3,
+            fill: true,
+          },
+        ],
       },
-      options: chartOptions
+      options: chartOptions,
     });
 
     charts.irCenter = new Chart(document.getElementById("ir-center-chart"), {
       type: "line",
       data: {
         labels: [],
-        datasets: [{
-          label: "IR Center",
-          data: [],
-          borderColor: neonOrange,
-          backgroundColor: 'rgba(255, 107, 53, 0.1)',
-          borderWidth: 3,
-          pointBackgroundColor: neonOrange,
-          pointBorderColor: neonOrange,
-          pointRadius: 4,
-          pointHoverRadius: 6,
-          tension: 0.3,
-          fill: true
-        }]
+        datasets: [
+          {
+            label: "IR Center",
+            data: [],
+            borderColor: neonOrange,
+            backgroundColor: "rgba(255, 107, 53, 0.1)",
+            borderWidth: 3,
+            pointBackgroundColor: neonOrange,
+            pointBorderColor: neonOrange,
+            pointRadius: 4,
+            pointHoverRadius: 6,
+            tension: 0.3,
+            fill: true,
+          },
+        ],
       },
-      options: chartOptions
+      options: chartOptions,
     });
 
     charts.irRight = new Chart(document.getElementById("ir-right-chart"), {
       type: "line",
       data: {
         labels: [],
-        datasets: [{
-          label: "IR Right",
-          data: [],
-          borderColor: neonGreen,
-          backgroundColor: 'rgba(57, 255, 20, 0.1)',
-          borderWidth: 3,
-          pointBackgroundColor: neonGreen,
-          pointBorderColor: neonGreen,
-          pointRadius: 4,
-          pointHoverRadius: 6,
-          tension: 0.3,
-          fill: true
-        }]
+        datasets: [
+          {
+            label: "IR Right",
+            data: [],
+            borderColor: neonGreen,
+            backgroundColor: "rgba(57, 255, 20, 0.1)",
+            borderWidth: 3,
+            pointBackgroundColor: neonGreen,
+            pointBorderColor: neonGreen,
+            pointRadius: 4,
+            pointHoverRadius: 6,
+            tension: 0.3,
+            fill: true,
+          },
+        ],
       },
-      options: chartOptions
+      options: chartOptions,
     });
   }
 
   function updateCharts(data) {
     // Format timestamps to be shorter
-    const formattedTimestamps = data.timestamps.map(ts => {
+    const formattedTimestamps = data.timestamps.map((ts) => {
       const d = new Date(ts);
-      return d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+      return d.toLocaleTimeString("en-US", {
+        hour: "2-digit",
+        minute: "2-digit",
+      });
     });
 
     // Update ultrasonic chart
@@ -231,11 +243,11 @@
     fetch("/api/historical-data", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ date: date })
+      body: JSON.stringify({ date: date }),
     })
-      .then(response => response.json())
-      .then(data => updateCharts(data))
-      .catch(error => {
+      .then((response) => response.json())
+      .then((data) => updateCharts(data))
+      .catch((error) => {
         console.error("Error loading historical data:", error);
         alert("Error loading data. Please try again.");
       });
@@ -245,11 +257,11 @@
     fetch("/api/historical-data", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({})
+      body: JSON.stringify({}),
     })
-      .then(response => response.json())
-      .then(data => updateCharts(data))
-      .catch(error => {
+      .then((response) => response.json())
+      .then((data) => updateCharts(data))
+      .catch((error) => {
         console.error("Error loading data:", error);
         alert("Error loading data. Please try again.");
       });
@@ -260,7 +272,7 @@
 
   // Set today's date as default
   document.getElementById("date-input").valueAsDate = new Date();
-  
+
   // Load today's data automatically
   loadHistoricalData();
 </script>
