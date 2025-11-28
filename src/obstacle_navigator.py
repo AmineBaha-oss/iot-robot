@@ -177,25 +177,29 @@ class HeadUltrasonicNavigator:
         except Exception:
             pass
         
-        # Fallback to direct GPIO access (if no cache available)
-        try:
-            d=self.us.get_distance()
-            if d is None or d<=0 or d>400: return None
-            # Write to cache for other processes (telemetry)
+        # Fallback to direct GPIO access (if no cache available and sensor is initialized)
+        if hasattr(self.us, 'get_distance') and not isinstance(self.us, type(None)):
             try:
-                self.ULTRA_CACHE.write_text(f"{d:.1f}")
-            except Exception:
-                pass
-            return d
-        except Exception as e:
-            # If GPIO access fails (e.g., resource busy), try cache again
-            try:
-                if self.ULTRA_CACHE.exists():
-                    cached_d = float(self.ULTRA_CACHE.read_text().strip())
-                    if cached_d and cached_d > 0 and cached_d <= 400:
-                        return cached_d
-            except Exception:
-                pass
+                d=self.us.get_distance()
+                if d is None or d<=0 or d>400: return None
+                # Write to cache for other processes (telemetry)
+                try:
+                    self.ULTRA_CACHE.write_text(f"{d:.1f}")
+                except Exception:
+                    pass
+                return d
+            except Exception as e:
+                # If GPIO access fails (e.g., resource busy), try cache again
+                try:
+                    if self.ULTRA_CACHE.exists():
+                        cached_d = float(self.ULTRA_CACHE.read_text().strip())
+                        if cached_d and cached_d > 0 and cached_d <= 400:
+                            return cached_d
+                except Exception:
+                    pass
+                return None
+        else:
+            # No GPIO sensor available, cache-only mode
             return None
     def _avg_cm(self,n=2,delay=0.0)->float:
         vals=[]
@@ -317,7 +321,20 @@ def main():
     car = Ordinary_Car()
     pan = PanServo(channel=args.pan_channel, min_deg=args.pan_min, max_deg=args.pan_max, center=args.pan_center)
     tilt= TiltServo(channel=args.tilt_channel, min_deg=args.tilt_min, max_deg=args.tilt_max, center=args.tilt_center)
-    us  = Ultrasonic()
+    
+    # Try to initialize ultrasonic sensor, but fall back to cache-only mode if GPIO is busy
+    us = None
+    try:
+        us = Ultrasonic()
+        print("[NAV] Ultrasonic sensor initialized (GPIO mode)")
+    except Exception as e:
+        print(f"[NAV] Warning: Could not initialize ultrasonic sensor (GPIO busy?): {e}")
+        print("[NAV] Will use cache-only mode (reading from /tmp/ultra_cm.txt)")
+        # Create a dummy object that will be ignored
+        class DummyUltrasonic:
+            def get_distance(self): return None
+        us = DummyUltrasonic()
+    
     ps  = PanSweeper(pan, lo=args.pan_min, hi=args.pan_max, speed_deg_per_tick=args.sweep_speed)
     to  = TiltOscillator(tilt, low=args.tilt_min, high=args.tilt_max, step=args.tilt_step)
 
