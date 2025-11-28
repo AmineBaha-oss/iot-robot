@@ -167,40 +167,22 @@ class HeadUltrasonicNavigator:
     ULTRA_CACHE = Path("/tmp/ultra_cm.txt")
     
     def _read_cm(self)->Optional[float]:
-        # Try reading from cache first (if telemetry/ultra_cache_writer is running)
-        # This avoids GPIO conflicts when multiple processes need ultrasonic data
-        try:
-            if self.ULTRA_CACHE.exists() and (time.time() - self.ULTRA_CACHE.stat().st_mtime) <= 2.5:
-                cached_d = float(self.ULTRA_CACHE.read_text().strip())
-                if cached_d and cached_d > 0 and cached_d <= 400:
-                    return cached_d
-        except Exception:
-            pass
-        
-        # Fallback to direct GPIO access (if no cache available and sensor is initialized)
+        """Read ultrasonic sensor - GPIO first, write to cache for telemetry"""
+        # Read directly from GPIO (primary method)
         if hasattr(self.us, 'get_distance') and not isinstance(self.us, type(None)):
             try:
-                d=self.us.get_distance()
-                if d is None or d<=0 or d>400: return None
-                # Write to cache for other processes (telemetry)
+                d = self.us.get_distance()
+                if d is None or d <= 0 or d > 400: 
+                    return None
+                # Write to cache for telemetry to read
                 try:
                     self.ULTRA_CACHE.write_text(f"{d:.1f}")
-                except Exception:
+                except:
                     pass
                 return d
-            except Exception as e:
-                # If GPIO access fails (e.g., resource busy), try cache again
-                try:
-                    if self.ULTRA_CACHE.exists():
-                        cached_d = float(self.ULTRA_CACHE.read_text().strip())
-                        if cached_d and cached_d > 0 and cached_d <= 400:
-                            return cached_d
-                except Exception:
-                    pass
+            except Exception:
                 return None
-        else:
-            # No GPIO sensor available, cache-only mode
-            return None
+        return None
     def _avg_cm(self,n=2,delay=0.0)->float:
         vals=[]
         for _ in range(n):

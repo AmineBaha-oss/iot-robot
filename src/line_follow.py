@@ -31,44 +31,25 @@ def clamp(x, lo, hi):
     return lo if x < lo else hi if x > hi else x
 
 def read_triplet(ir, order, active_low):
-    """Read IR sensors - try cache first, fallback to GPIO"""
-    # Try reading from cache first (if telemetry/other process is writing to it)
-    try:
-        if IR_CACHE.exists() and (time.time() - IR_CACHE.stat().st_mtime) <= 2.5:
-            cached_text = IR_CACHE.read_text().strip()
-            parts = cached_text.replace(",", " ").split()
-            if len(parts) >= 3:
-                L, M, R = int(parts[0]), int(parts[1]), int(parts[2])
-                # Normalize so 1 = sees black line, 0 = background
-                if active_low:
-                    L, M, R = (1-L), (1-M), (1-R)
-                return L, M, R
-    except Exception:
-        pass
-    
-    # Fallback to direct GPIO access (if no cache available)
+    """Read IR sensors - GPIO first, write to cache for telemetry"""
+    # Read directly from GPIO (primary method)
     try:
         L = ir.read_one_infrared(order[0])
         M = ir.read_one_infrared(order[1])
         R = ir.read_one_infrared(order[2])
+        
+        # Write to cache for telemetry to read
+        try:
+            IR_CACHE.write_text(f"{int(L)} {int(M)} {int(R)}")
+        except:
+            pass
+        
         # Normalize so 1 = sees black line, 0 = background
         if active_low:
             L, M, R = (1-L), (1-M), (1-R)
         return L, M, R
     except Exception as e:
-        # If GPIO access fails (e.g., resource busy), try cache again
-        try:
-            if IR_CACHE.exists():
-                cached_text = IR_CACHE.read_text().strip()
-                parts = cached_text.replace(",", " ").split()
-                if len(parts) >= 3:
-                    L, M, R = int(parts[0]), int(parts[1]), int(parts[2])
-                    if active_low:
-                        L, M, R = (1-L), (1-M), (1-R)
-                    return L, M, R
-        except Exception:
-            pass
-        # Last resort: return all zeros (no line detected)
+        # GPIO failed - return zeros
         return 0, 0, 0
 
 def main():
