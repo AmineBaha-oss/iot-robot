@@ -206,6 +206,18 @@ def is_algorithm_running():
     
     return False  # No algorithms running
 
+def is_line_tracking_running():
+    """Check if line tracking is running (uses IR sensors)"""
+    line_tracking_pid = Path("/tmp/line_follow.pid")
+    if line_tracking_pid.exists():
+        try:
+            pid = int(line_tracking_pid.read_text().strip())
+            os.kill(pid, 0)  # Signal 0 just checks if process exists
+            return True
+        except (OSError, ValueError):
+            pass
+    return False
+
 def write_sensor_cache():
     """Continuously read IR sensors and write to cache files
     Only reads GPIO when algorithms are NOT running (to avoid conflicts)
@@ -251,13 +263,13 @@ def write_sensor_cache():
                         pass
             else:
                 # Algorithms are running - they write to cache themselves
-                # Just check cache files are being updated (for monitoring)
-                if t - last_ir_time >= 1.0:  # Check every second
+                # Only check IR cache if line tracking is running (obstacle avoidance doesn't use IR)
+                if is_line_tracking_running() and t - last_ir_time >= 1.0:  # Check every second
                     if IR_CACHE.exists():
                         mtime = IR_CACHE.stat().st_mtime
                         age = t - mtime
                         if age > 3.0:
-                            print(f"[sensor_cache] Warning: IR cache not updated in {age:.1f}s")
+                            print(f"[sensor_cache] Warning: IR cache not updated in {age:.1f}s (line tracking should be writing)")
                     last_ir_time = t
             
             time.sleep(0.05)  # Small delay to prevent CPU overload

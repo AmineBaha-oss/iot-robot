@@ -19,4 +19,7 @@ requests>=2.31.0
 # Database drivers
 psycopg2-binary>=2.9.0  # PostgreSQL for Neon.com
 
+# NumPy for LED pixel driver (SPI)
+numpy>=1.24.0
+
 

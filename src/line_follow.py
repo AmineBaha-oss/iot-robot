@@ -1,37 +1,34 @@
 #!/usr/bin/env python3
+"""
+Line Following Algorithm for IoT Smart Robot Car
+Reads IR sensors and follows black line on white surface
+Writes sensor data to cache for telemetry to read
+"""
 import time, argparse, sys
 from pathlib import Path
-_IR_CACHE_PATH = Path('/tmp/ir_triplet.txt')
-_IR_STATE_PATH = Path('/tmp/line_state.txt')
-def _ir_state_from_bits(L,M,R):
-    # your prints look like L=0/1 etc; we’ll encode a compact state string
-    s=''
-    if L: s+='L'
-    if M: s+='M'
-    if R: s+='R'
-    return s or '0'
-def _write_ir_cache(L,M,R):
-    try:
-        _IR_CACHE_PATH.write_text(f"{int(L)},{int(M)},{int(R)}\n")
-        _IR_STATE_PATH.write_text(_ir_state_from_bits(int(L),int(M),int(R)))
-    except Exception:
-        pass
-
-
-from pathlib import Path
-def _ir_cache_write(L, M, R):
-    try:
-        Path('/tmp/ir_lmr.txt').write_text(f"{int(L)} {int(M)} {int(R)}")
-    except Exception:
-        pass
 
 from hardware.motor import Ordinary_Car
 from hardware.infrared import Infrared
 
+# Cache paths for inter-process communication
+IR_CACHE = Path('/tmp/ir_lmr.txt')
+LINE_STATE_CACHE = Path('/tmp/line_state.txt')
+
+def _ir_cache_write(L, M, R):
+    """Write IR sensor values to cache for telemetry"""
+    try:
+        IR_CACHE.write_text(f"{int(L)} {int(M)} {int(R)}")
+        # Also write line state
+        state = ''
+        if L: state += 'L'
+        if M: state += 'M'
+        if R: state += 'R'
+        LINE_STATE_CACHE.write_text(state or '0')
+    except Exception:
+        pass
+
 def clamp(x, lo, hi): 
     return lo if x < lo else hi if x > hi else x
-
-IR_CACHE = Path('/tmp/ir_lmr.txt')
 
 def read_triplet(ir, order, active_low):
     """Read IR sensors - try cache first, fallback to GPIO"""

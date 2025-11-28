@@ -13,8 +13,12 @@ logs/
 # Secrets / config (keep samples instead)
 src/adafruit.json
 src/.merged_adafruit.json
+config/adafruit.json
 config/*.env
 *.env
+
+# Local database
+db/
 
 # Server folder (removed from tracking)
 src/Server/

@@ -241,14 +241,6 @@ class Telemetry:
                                 line_state=line_state if line_state else None
                             )
                 
-                # Also save ultrasonic-only records periodically (but less frequently)
-                # This ensures we have ultrasonic data even when IR sensors aren't active
-                if DB_AVAILABLE and self.last_ultrasonic is not None and (t - self.t_us) < self.dt_us * 0.5:
-                    # Only save if we have fresh ultrasonic and haven't saved IR recently
-                    if (t - self.t_ir) >= self.dt_ir * 0.8:  # Save ultrasonic if IR hasn't been read recently
-                        timestamp = datetime.datetime.now().isoformat()
-                        save_to_local_db(timestamp=timestamp, ultrasonic=float(self.last_ultrasonic))
-
                 # Camera (optional, non-GPIO)
                 if t - self.t_cam >= self.dt_cam:
                     self.t_cam = t
