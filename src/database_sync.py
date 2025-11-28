@@ -7,6 +7,7 @@ import sqlite3
 import os
 import json
 import time
+import sys
 from pathlib import Path
 from datetime import datetime
 import psycopg2

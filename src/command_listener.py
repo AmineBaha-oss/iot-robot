@@ -2,6 +2,7 @@
 """
 Command Listener for Raspberry Pi
 Listens to Adafruit IO MQTT feeds for control commands from Flask web app
+Also reads sensors and writes to cache files for telemetry.py to read
 """
 import json
 import os
@@ -9,6 +10,7 @@ import sys
 import time
 import signal
 import subprocess
+import threading
 import paho.mqtt.client as mqtt
 from pathlib import Path
 
@@ -44,6 +46,17 @@ CONTROL_FEEDS = {
     "line_tracking": "line-tracking",
     "obstacle_avoidance": "obstacle-avoidance"
 }
+
+
+
+# Cache file paths (same as used by telemetry.py)
+IR_CACHE = Path("/tmp/ir_lmr.txt")
+ULTRA_CACHE = Path("/tmp/ultra_cm.txt")
+
+# Global sensor instances
+_ultrasonic_instance = None
+_infrared_instance = None
+_sensor_thread_running = False
 
 def on_connect(client, userdata, flags, rc):
     """Callback when connected to MQTT broker"""
@@ -101,6 +114,92 @@ def get_car():
         except Exception as e:
             print(f"Error creating car instance: {e}")
     return _car_instance
+
+def get_ultrasonic():
+    """Get or create ultrasonic sensor instance (singleton)"""
+    global _ultrasonic_instance
+    if _ultrasonic_instance is None:
+        try:
+            from hardware.ultrasonic import Ultrasonic
+            _ultrasonic_instance = Ultrasonic()
+            print("[sensor_cache] Ultrasonic sensor initialized")
+        except Exception as e:
+            print(f"[sensor_cache] Error creating ultrasonic sensor: {e}")
+    return _ultrasonic_instance
+
+def get_infrared():
+    """Get or create infrared sensor instance (singleton)"""
+    global _infrared_instance
+    if _infrared_instance is None:
+        try:
+            from hardware.infrared import Infrared
+            _infrared_instance = Infrared()
+            print("[sensor_cache] IR sensors initialized")
+        except Exception as e:
+            print(f"[sensor_cache] Error creating IR sensors: {e}")
+    return _infrared_instance
+
+def write_sensor_cache():
+    """Continuously read sensors and write to cache files"""
+    global _sensor_thread_running
+    
+    ultrasonic = get_ultrasonic()
+    infrared = get_infrared()
+    
+    if not ultrasonic or not infrared:
+        print("[sensor_cache] Warning: Sensors not available, cache writing disabled")
+        return
+    
+    print("[sensor_cache] Starting sensor cache writer thread...")
+    _sensor_thread_running = True
+    
+    last_ultra_time = 0
+    last_ir_time = 0
+    ultra_interval = 0.1  # Read ultrasonic every 100ms
+    ir_interval = 0.1     # Read IR every 100ms
+    
+    while _sensor_thread_running:
+        try:
+            t = time.time()
+            
+            # Read and write ultrasonic sensor
+            if t - last_ultra_time >= ultra_interval:
+                try:
+                    distance = ultrasonic.get_distance()
+                    if distance is not None and distance > 0 and distance <= 400:
+                        ULTRA_CACHE.write_text(f"{distance:.1f}")
+                        last_ultra_time = t
+                except Exception as e:
+                    # GPIO might be busy, skip this cycle
+                    pass
+            
+            # Read and write IR sensors
+            if t - last_ir_time >= ir_interval:
+                try:
+                    L = infrared.read_one_infrared(1)  # Channel 1 = Left
+                    M = infrared.read_one_infrared(2)  # Channel 2 = Center
+                    R = infrared.read_one_infrared(3)  # Channel 3 = Right
+                    # Write in format: "L M R" (space-separated)
+                    IR_CACHE.write_text(f"{int(L)} {int(M)} {int(R)}")
+                    last_ir_time = t
+                except Exception as e:
+                    # GPIO might be busy, skip this cycle
+                    pass
+            
+            time.sleep(0.05)  # Small delay to prevent CPU overload
+            
+        except Exception as e:
+            print(f"[sensor_cache] Error in cache writer: {e}")
+            time.sleep(0.5)  # Wait longer on error
+    
+    print("[sensor_cache] Sensor cache writer thread stopped")
+
+def start_sensor_cache_writer():
+    """Start background thread for writing sensor cache files"""
+    thread = threading.Thread(target=write_sensor_cache, daemon=True)
+    thread.start()
+    time.sleep(0.5)  # Give thread time to initialize
+    return thread
 
 def handle_motor_control(action):
     """Handle motor control commands"""
@@ -502,19 +601,43 @@ def handle_obstacle_avoidance(command):
 
 def main():
     """Main function"""
+    # Start sensor cache writer thread (reads sensors and writes to cache files)
+    print("[command_listener] Starting sensor cache writer...")
+    cache_thread = start_sensor_cache_writer()
+    
+    # Set up MQTT client for command listening
     client = mqtt.Client(client_id="robot_command_listener")
     client.username_pw_set(AIO_USERNAME, AIO_KEY)
     client.on_connect = on_connect
     client.on_message = on_message
     
     try:
+        print("[command_listener] Connecting to Adafruit IO...")
         client.connect("io.adafruit.com", 1883, 60)
+        print("[command_listener] Connected! Listening for commands...")
         client.loop_forever()
     except KeyboardInterrupt:
-        print("\nShutting down...")
+        print("\n[command_listener] Shutting down...")
+        global _sensor_thread_running
+        _sensor_thread_running = False
+        time.sleep(0.5)  # Give cache thread time to stop
         client.disconnect()
+        
+        # Clean up sensor instances
+        if _ultrasonic_instance:
+            try:
+                _ultrasonic_instance.close()
+            except:
+                pass
+        if _infrared_instance:
+            try:
+                _infrared_instance.close()
+            except:
+                pass
     except Exception as e:
-        print(f"Error: {e}")
+        print(f"[command_listener] Error: {e}")
+        global _sensor_thread_running
+        _sensor_thread_running = False
 
 if __name__ == "__main__":
     main()
