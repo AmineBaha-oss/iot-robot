@@ -35,7 +35,7 @@ def load_cfg():
     if override_path and Path(override_path).exists():
         cfg = json.loads(Path(override_path).read_text())
     else:
-    cfg = json.loads((BASE/"adafruit.json").read_text())
+        cfg = json.loads((BASE/"adafruit.json").read_text())
     a = cfg["adafruit"] if "adafruit" in cfg else cfg
     username = a.get("username") or a.get("user")
     key      = a.get("key") or a.get("aio_key")
