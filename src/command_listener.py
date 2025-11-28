@@ -204,26 +204,27 @@ def handle_line_tracking(command):
         # Start line following script
         script = BASE_DIR / "line_follow.py"
         try:
+            # Don't capture stdout/stderr - let it print to console for debugging
+            # This prevents buffering issues and allows seeing real-time output
             process = subprocess.Popen(
                 ["python3", str(script)],
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True,
+                stdout=None,  # Don't capture - print to console
+                stderr=None,  # Don't capture - print to console
                 preexec_fn=os.setsid  # Start in new process group
             )
             # Save PID
             PID_FILE.write_text(str(process.pid))
             
-            # Check if it started successfully
-            time.sleep(0.5)
+            # Check if it started successfully (wait a bit longer)
+            time.sleep(1.0)
             if process.poll() is not None:
-                stdout, stderr = process.communicate()
-                print(f"Line tracking failed to start: {stderr}")
+                # Process died immediately - try to get error from stderr
+                print(f"❌ Line tracking failed to start (PID {process.pid} exited immediately)")
                 PID_FILE.unlink()
             else:
-                print("Line tracking started")
+                print(f"✅ Line tracking started (PID: {process.pid})")
         except Exception as e:
-            print(f"Error starting line tracking: {e}")
+            print(f"❌ Error starting line tracking: {e}", file=sys.stderr)
             if PID_FILE.exists():
                 PID_FILE.unlink()
     elif command == "stop":
