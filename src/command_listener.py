@@ -129,10 +129,21 @@ def is_telemetry_running():
         return False
 
 def release_gpio_pins(trigger_pin=27, echo_pin=22):
-    """Try to release GPIO pins by unexporting them"""
+    """Try to release GPIO pins by unexporting them and killing processes using them"""
     try:
+        # First, try to kill any processes that might be using ultrasonic sensor
+        # Check for processes using gpiozero or DistanceSensor
+        try:
+            subprocess.run(
+                ["pkill", "-f", "ultrasonic"],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                timeout=1
+            )
+        except:
+            pass
+        
         # Try to unexport GPIO pins if they're exported
-        gpio_export_path = Path("/sys/class/gpio/export")
         gpio_unexport_path = Path("/sys/class/gpio/unexport")
         
         if gpio_unexport_path.exists():
@@ -140,6 +151,7 @@ def release_gpio_pins(trigger_pin=27, echo_pin=22):
                 gpio_dir = Path(f"/sys/class/gpio/gpio{pin}")
                 if gpio_dir.exists():
                     try:
+                        # Try to unexport (requires root, but worth trying)
                         with open(gpio_unexport_path, 'w') as f:
                             f.write(str(pin))
                         time.sleep(0.1)
@@ -167,8 +179,9 @@ def get_ultrasonic():
         try:
             from hardware.ultrasonic import Ultrasonic
             # Try to release GPIO pins first (if possible)
+            print("[sensor_cache] Attempting to release GPIO pins 27/22...")
             release_gpio_pins(27, 22)
-            time.sleep(0.3)  # Give GPIO time to release
+            time.sleep(1.0)  # Give GPIO more time to release after algorithms stop
             
             # Try multiple times with delay (GPIO might be busy)
             max_retries = 3
