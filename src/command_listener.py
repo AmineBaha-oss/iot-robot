@@ -281,51 +281,53 @@ def handle_line_tracking(command):
         # Always try pkill as well (most reliable method)
         try:
             print("[DEBUG] Using pkill to find and kill line_follow.py processes...")
-            result = subprocess.run(
-                ["pkill", "-f", "line_follow.py"],
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                timeout=2
-            )
-            if result.returncode == 0:
-                stopped = True
-                print("[DEBUG] pkill found and killed line_follow.py processes")
-            elif result.returncode == 1:
-                print("[DEBUG] pkill found no matching processes")
-            else:
-                print(f"[DEBUG] pkill returned code {result.returncode}")
+            # Try multiple patterns to catch the process
+            patterns = ["line_follow.py", "line-follow", "line_follow"]
+            for pattern in patterns:
+                result = subprocess.run(
+                    ["pkill", "-9", "-f", pattern],
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    timeout=2
+                )
+                if result.returncode == 0:
+                    stopped = True
+                    print(f"[DEBUG] pkill killed processes matching: {pattern}")
+                    break
         except subprocess.TimeoutExpired:
             print("[DEBUG] pkill timed out")
         except Exception as e:
             print(f"[DEBUG] Error using pkill: {e}")
         
-        # Verify it's actually stopped
+        # Verify it's actually stopped - check multiple patterns
         try:
-            check_result = subprocess.run(
-                ["pgrep", "-f", "line_follow.py"],
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                timeout=1
-            )
-            if check_result.returncode == 0:
-                remaining_pids = check_result.stdout.decode().strip().split('\n')
-                remaining_pids = [p for p in remaining_pids if p]
-                if remaining_pids:
-                    print(f"[DEBUG] Warning: Still found processes: {remaining_pids}")
-                    # Try one more time with SIGKILL
-                    for pid_str in remaining_pids:
-                        try:
-                            pid = int(pid_str)
-                            os.kill(pid, signal.SIGKILL)
-                            print(f"[DEBUG] Force killed remaining process {pid}")
-                        except:
-                            pass
-                else:
-                    stopped = True
-            else:
+            patterns_to_check = ["line_follow.py", "line-follow", "line_follow"]
+            all_stopped = True
+            for pattern in patterns_to_check:
+                check_result = subprocess.run(
+                    ["pgrep", "-f", pattern],
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    timeout=1
+                )
+                if check_result.returncode == 0:
+                    remaining_pids = check_result.stdout.decode().strip().split('\n')
+                    remaining_pids = [p for p in remaining_pids if p]
+                    if remaining_pids:
+                        print(f"[DEBUG] Warning: Still found processes matching '{pattern}': {remaining_pids}")
+                        all_stopped = False
+                        # Force kill any remaining processes
+                        for pid_str in remaining_pids:
+                            try:
+                                pid = int(pid_str)
+                                os.kill(pid, signal.SIGKILL)
+                                print(f"[DEBUG] Force killed remaining process {pid}")
+                            except:
+                                pass
+            if all_stopped:
                 stopped = True
-        except:
-            pass
+        except Exception as e:
+            print(f"[DEBUG] Error verifying stop: {e}")
         
         if stopped:
             print("✅ Line tracking stopped")
