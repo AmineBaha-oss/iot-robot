@@ -185,6 +185,7 @@ class Telemetry:
         self.dt_us  = intervals["ultrasonic_sec"]
         self.dt_cam = intervals["camera_sec"]
         self.t_ir = self.t_us = self.t_cam = self.t_sync = 0.0
+        self.last_ultrasonic = None  # Keep last known ultrasonic value
         self.cam = CamReader() if (os.environ.get("TELEM_SKIP_CAM") != "1") else None
         self.log = CsvLogger(BASE / log_cfg.get("path","logs/telemetry.csv")) if log_cfg.get("enabled",True) else None
         self.stop = False
