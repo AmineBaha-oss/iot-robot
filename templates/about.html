@@ -1,68 +1,70 @@
-{% extends "base.html" %} {% block title %}About - IoT Smart Robot Car{%
-endblock %} {% block content %}
+{% extends "base.html" %} 
+{% block title %}About - ROBOCAR X1{% endblock %} 
+{% block content %}
 <div class="container">
-  <h1 class="page-title">About</h1>
+  <h1 class="page-title">About System</h1>
 
   <div class="about-content">
     <div class="card">
-      <h2>Project Information</h2>
-      <p>
-        <strong>Course:</strong> 420-N55: IoT: Design and Prototyping of
-        Connected Devices
-      </p>
-      <p><strong>Institution:</strong> Champlain College Saint-Lambert</p>
-      <p><strong>Professor:</strong> Haikel Hichri</p>
-      <p><strong>Semester:</strong> Fall 2025</p>
+      <div class="card-header">
+        <h2>◈ Project Information</h2>
+      </div>
+      <div class="card-body">
+        <p><strong>Course:</strong> 420-N55: IoT - Design and Prototyping of Connected Devices</p>
+        <p><strong>Institution:</strong> Champlain College Saint-Lambert</p>
+        <p><strong>Professor:</strong> Haikel Hichri</p>
+        <p><strong>Semester:</strong> Fall 2025</p>
+        <p><strong>Milestone:</strong> 3 - Complete System Integration</p>
+      </div>
     </div>
 
     <div class="card">
-      <h2>System Architecture</h2>
-      <p>This IoT Smart Robot Car system consists of:</p>
-      <ul>
-        <li>
-          <strong>Raspberry Pi:</strong> Main controller running Python
-          applications
-        </li>
-        <li>
-          <strong>Sensors:</strong> Ultrasonic distance sensor, IR line sensors
-          (left, center, right)
-        </li>
-        <li><strong>Actuators:</strong> DC motors, LEDs, buzzer, servos</li>
-        <li>
-          <strong>Adafruit IO:</strong> Cloud platform for real-time data
-          streaming via MQTT
-        </li>
-        <li>
-          <strong>Cloud Database:</strong> Neon.com PostgreSQL for historical
-          data storage
-        </li>
-        <li>
-          <strong>Local Database:</strong> SQLite for offline data storage and
-          sync
-        </li>
-        <li>
-          <strong>Flask Web App:</strong> Web interface for monitoring and
-          control
-        </li>
-      </ul>
+      <div class="card-header">
+        <h2>◈ System Architecture</h2>
+      </div>
+      <div class="card-body">
+        <p>The ROBOCAR X1 is a fully integrated IoT smart robot car system featuring:</p>
+        <ul>
+          <li><strong>Raspberry Pi 4:</strong> Main controller running Python 3.11</li>
+          <li><strong>Ultrasonic Sensor:</strong> HC-SR04 for distance measurement (2cm - 400cm)</li>
+          <li><strong>IR Line Sensors:</strong> 3-channel array for line detection and tracking</li>
+          <li><strong>Motor Driver:</strong> 4-wheel DC motor control with PWM</li>
+          <li><strong>LED Array:</strong> Addressable RGB LEDs via SPI</li>
+          <li><strong>Pan/Tilt Servos:</strong> Camera gimbal for scanning</li>
+          <li><strong>Adafruit IO:</strong> MQTT broker for real-time cloud communication</li>
+          <li><strong>Neon PostgreSQL:</strong> Cloud database for historical data</li>
+          <li><strong>SQLite:</strong> Local database for offline operation</li>
+          <li><strong>Flask + Chart.js:</strong> Modern web dashboard</li>
+        </ul>
+      </div>
     </div>
 
     <div class="card">
-      <h2>Features</h2>
-      <ul>
-        <li>Real-time sensor data monitoring</li>
-        <li>Historical data visualization with Chart.js</li>
-        <li>Remote car control (forward, backward, left, right)</li>
-        <li>Line following algorithm</li>
-        <li>Obstacle avoidance algorithm</li>
-        <li>Offline data storage with automatic sync</li>
-        <li>Device control (motors, LEDs, buzzer)</li>
-      </ul>
+      <div class="card-header">
+        <h2>◈ Features</h2>
+      </div>
+      <div class="card-body">
+        <ul>
+          <li>Real-time sensor data streaming via MQTT</li>
+          <li>Historical data visualization with interactive charts</li>
+          <li>Remote motor control (forward, backward, left, right, stop)</li>
+          <li>Autonomous line following with PD control algorithm</li>
+          <li>Autonomous obstacle avoidance with pan-tilt scanning</li>
+          <li>Offline data caching with automatic cloud sync</li>
+          <li>Device control (LEDs, buzzer) via web interface</li>
+          <li>Responsive cyberpunk-themed UI design</li>
+        </ul>
+      </div>
     </div>
 
     <div class="card">
-      <h2>Team Members</h2>
-      <p>Add your team member names here</p>
+      <div class="card-header">
+        <h2>◈ Developer</h2>
+      </div>
+      <div class="card-body">
+        <p><strong>Name:</strong> Amine Baha</p>
+        <p><strong>Student ID:</strong> 2332522</p>
+      </div>
     </div>
   </div>
 </div>
