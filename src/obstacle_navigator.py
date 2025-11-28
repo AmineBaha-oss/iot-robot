@@ -203,9 +203,19 @@ class HeadUltrasonicNavigator:
         # sample every tick (instant reaction at threshold)
         if self.ticks % self.sample_every == 0:
             ahead=self._avg_cm(n=2,delay=0.0); self.last_ahead=ahead
-            try: Path('/tmp/ultra_cm.txt').write_text(f"{ahead:.1f}")
-            except Exception: pass
+            # Write to cache file for telemetry daemon (always, even if not verbose)
+            try: 
+                Path('/tmp/ultra_cm.txt').write_text(f"{ahead:.1f}")
+            except Exception: 
+                pass
             if verbose: print(f"[NAV] ahead {ahead:.1f} cm @ pan {ppos:3d} tilt {tpos:3d}")
+        else:
+            # Even when not sampling, write last known distance to keep cache fresh
+            if self.last_ahead < 9999.0:
+                try:
+                    Path('/tmp/ultra_cm.txt').write_text(f"{self.last_ahead:.1f}")
+                except Exception:
+                    pass
 
             if ahead <= self.obs_th:
                 # STOP immediately
@@ -291,6 +301,16 @@ def main():
     )
 
     print("Head-scan navigator ready. Ctrl+C to stop.")
+    
+    # Write initial distance reading to cache for telemetry
+    try:
+        initial_dist = nav._avg_cm(n=2, delay=0.0)
+        if initial_dist < 9999.0:
+            Path('/tmp/ultra_cm.txt').write_text(f"{initial_dist:.1f}")
+            print(f"[NAV] Initial distance: {initial_dist:.1f} cm (written to cache)")
+    except Exception as e:
+        print(f"[NAV] Warning: Could not write initial distance: {e}")
+    
     try:
         while True:
             nav.tick(verbose=args.verbose)
