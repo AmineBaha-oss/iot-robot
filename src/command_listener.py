@@ -709,12 +709,13 @@ def handle_obstacle_avoidance(command):
             print("⚠️  Obstacle avoidance stop attempted (check if process was running)")
 
 def main():
-    """Main function"""
+    """Main function - MQTT command listener only, NO sensor handling"""
     global _sensor_thread_running
     
-    # Start sensor cache writer thread (reads sensors and writes to cache files)
-    print("[command_listener] Starting sensor cache writer...")
-    cache_thread = start_sensor_cache_writer()
+    # IMPORTANT: Do NOT start sensor cache writer!
+    # Algorithms (line_follow.py, obstacle_navigator.py) handle sensors themselves
+    # This avoids GPIO conflicts
+    print("[command_listener] Starting (NO sensor reading - algorithms handle sensors)")
     
     # Set up MQTT client for command listening
     client = mqtt.Client(client_id="robot_command_listener")
@@ -729,24 +730,9 @@ def main():
         client.loop_forever()
     except KeyboardInterrupt:
         print("\n[command_listener] Shutting down...")
-        _sensor_thread_running = False
-        time.sleep(0.5)  # Give cache thread time to stop
         client.disconnect()
-        
-        # Clean up sensor instances
-        if _ultrasonic_instance:
-            try:
-                _ultrasonic_instance.close()
-            except:
-                pass
-        if _infrared_instance:
-            try:
-                _infrared_instance.close()
-            except:
-                pass
     except Exception as e:
         print(f"[command_listener] Error: {e}")
-        _sensor_thread_running = False
 
 if __name__ == "__main__":
     main()
