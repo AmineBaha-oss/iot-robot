@@ -228,24 +228,49 @@ def handle_line_tracking(command):
                 PID_FILE.unlink()
     elif command == "stop":
         # Stop line following
+        stopped = False
+        
+        # First try using PID file
         if PID_FILE.exists():
             try:
                 pid = int(PID_FILE.read_text().strip())
                 try:
-                    os.killpg(os.getpgid(pid), signal.SIGTERM)  # Kill process group
+                    # Try to get process group
+                    pgid = os.getpgid(pid)
+                    os.killpg(pgid, signal.SIGTERM)  # Kill process group
                     time.sleep(0.5)
-                    os.killpg(os.getpgid(pid), signal.SIGKILL)  # Force kill if still running
+                    # Check if still running
+                    try:
+                        os.kill(pid, 0)  # Check if process exists
+                        os.killpg(pgid, signal.SIGKILL)  # Force kill if still running
+                    except (OSError, ProcessLookupError):
+                        pass  # Process already dead
+                    stopped = True
                 except (OSError, ProcessLookupError):
+                    # Process doesn't exist or no process group
                     pass
                 PID_FILE.unlink()
-            except (ValueError, OSError):
+            except (ValueError, OSError) as e:
+                print(f"Error reading PID file: {e}")
                 PID_FILE.unlink()
         
-        # Also try pkill as fallback
-        subprocess.run(["pkill", "-f", "line_follow.py"],
-                      stdout=subprocess.DEVNULL,
-                      stderr=subprocess.DEVNULL)
-        print("Line tracking stopped")
+        # Also try pkill as fallback (more reliable)
+        try:
+            result = subprocess.run(
+                ["pkill", "-f", "line_follow.py"],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                timeout=2
+            )
+            if result.returncode == 0:
+                stopped = True
+        except Exception as e:
+            print(f"Error using pkill: {e}")
+        
+        if stopped:
+            print("Line tracking stopped")
+        else:
+            print("Line tracking stop attempted (process may not have been running)")
 
 def handle_obstacle_avoidance(command):
     """Handle obstacle avoidance commands"""
@@ -296,24 +321,49 @@ def handle_obstacle_avoidance(command):
                 PID_FILE.unlink()
     elif command == "stop":
         # Stop obstacle navigator
+        stopped = False
+        
+        # First try using PID file
         if PID_FILE.exists():
             try:
                 pid = int(PID_FILE.read_text().strip())
                 try:
-                    os.killpg(os.getpgid(pid), signal.SIGTERM)  # Kill process group
+                    # Try to get process group
+                    pgid = os.getpgid(pid)
+                    os.killpg(pgid, signal.SIGTERM)  # Kill process group
                     time.sleep(0.5)
-                    os.killpg(os.getpgid(pid), signal.SIGKILL)  # Force kill if still running
+                    # Check if still running
+                    try:
+                        os.kill(pid, 0)  # Check if process exists
+                        os.killpg(pgid, signal.SIGKILL)  # Force kill if still running
+                    except (OSError, ProcessLookupError):
+                        pass  # Process already dead
+                    stopped = True
                 except (OSError, ProcessLookupError):
+                    # Process doesn't exist or no process group
                     pass
                 PID_FILE.unlink()
-            except (ValueError, OSError):
+            except (ValueError, OSError) as e:
+                print(f"Error reading PID file: {e}")
                 PID_FILE.unlink()
         
-        # Also try pkill as fallback
-        subprocess.run(["pkill", "-f", "obstacle_navigator.py"], 
-                      stdout=subprocess.DEVNULL, 
-                      stderr=subprocess.DEVNULL)
-        print("Obstacle avoidance stopped")
+        # Also try pkill as fallback (more reliable)
+        try:
+            result = subprocess.run(
+                ["pkill", "-f", "obstacle_navigator.py"],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                timeout=2
+            )
+            if result.returncode == 0:
+                stopped = True
+        except Exception as e:
+            print(f"Error using pkill: {e}")
+        
+        if stopped:
+            print("Obstacle avoidance stopped")
+        else:
+            print("Obstacle avoidance stop attempted (process may not have been running)")
 
 def main():
     """Main function"""
