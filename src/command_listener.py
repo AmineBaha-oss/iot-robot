@@ -115,12 +115,61 @@ def get_car():
             print(f"Error creating car instance: {e}")
     return _car_instance
 
+def is_telemetry_running():
+    """Check if telemetry process is running"""
+    try:
+        result = subprocess.run(
+            ["pgrep", "-f", "telemetry_runner.py"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            timeout=1
+        )
+        return result.returncode == 0
+    except:
+        return False
+
+def release_gpio_pins(trigger_pin=27, echo_pin=22):
+    """Try to release GPIO pins by unexporting them"""
+    try:
+        # Try to unexport GPIO pins if they're exported
+        gpio_export_path = Path("/sys/class/gpio/export")
+        gpio_unexport_path = Path("/sys/class/gpio/unexport")
+        
+        if gpio_unexport_path.exists():
+            for pin in [trigger_pin, echo_pin]:
+                gpio_dir = Path(f"/sys/class/gpio/gpio{pin}")
+                if gpio_dir.exists():
+                    try:
+                        with open(gpio_unexport_path, 'w') as f:
+                            f.write(str(pin))
+                        time.sleep(0.1)
+                    except (PermissionError, IOError):
+                        pass  # Need root to unexport, that's okay
+    except Exception:
+        pass  # Ignore errors
+
 def get_ultrasonic():
-    """Get or create ultrasonic sensor instance (singleton)"""
+    """Get or create ultrasonic sensor instance (singleton)
+    Skips initialization if telemetry is running (to avoid GPIO conflicts)
+    """
     global _ultrasonic_instance
     if _ultrasonic_instance is None:
+        # Don't initialize if telemetry is running (it reads from cache anyway)
+        if is_telemetry_running():
+            print("[sensor_cache] Telemetry is running - skipping ultrasonic init (will use cache)")
+            return None
+        
+        # Check if algorithms are running - if they just stopped, wait a bit for GPIO to release
+        if is_algorithm_running():
+            print("[sensor_cache] Algorithms running - skipping ultrasonic init (will use cache)")
+            return None
+        
         try:
             from hardware.ultrasonic import Ultrasonic
+            # Try to release GPIO pins first (if possible)
+            release_gpio_pins(27, 22)
+            time.sleep(0.3)  # Give GPIO time to release
+            
             # Try multiple times with delay (GPIO might be busy)
             max_retries = 3
             for attempt in range(max_retries):
@@ -131,9 +180,12 @@ def get_ultrasonic():
                 except Exception as e:
                     if attempt < max_retries - 1:
                         print(f"[sensor_cache] Ultrasonic init attempt {attempt + 1} failed: {e}, retrying...")
-                        time.sleep(0.5)  # Wait before retry
+                        # Try releasing GPIO again before retry
+                        release_gpio_pins(27, 22)
+                        time.sleep(0.5 * (attempt + 1))  # Increasing wait time
                     else:
                         print(f"[sensor_cache] Error creating ultrasonic sensor after {max_retries} attempts: {e}")
+                        print("[sensor_cache] Will use cache files from algorithms instead")
                         # Don't set to None, keep trying on next call
                         return None
         except Exception as e:
@@ -262,6 +314,11 @@ def write_sensor_cache():
                         if age > 3.0:
                             print(f"[sensor_cache] Warning: IR cache not updated in {age:.1f}s")
                     last_ir_time = t
+                
+                # Try to initialize ultrasonic when algorithms stop (for next time)
+                # This helps recover from GPIO conflicts
+                if not ultrasonic:
+                    ultrasonic = get_ultrasonic()
             
             time.sleep(0.05)  # Small delay to prevent CPU overload
             
