@@ -181,6 +181,21 @@ def get_infrared():
             print(f"[sensor_cache] Error creating IR sensors: {e}")
     return _infrared_instance
 
+def release_infrared():
+    """Release IR sensor so algorithms can use GPIO"""
+    global _infrared_instance
+    if _infrared_instance is not None:
+        try:
+            # Try to close/cleanup the infrared sensor
+            if hasattr(_infrared_instance, 'close'):
+                _infrared_instance.close()
+            _infrared_instance = None
+            print("[sensor_cache] IR sensors released for algorithm use")
+            time.sleep(0.3)  # Give GPIO time to release
+        except Exception as e:
+            print(f"[sensor_cache] Error releasing IR sensors: {e}")
+            _infrared_instance = None
+
 def is_algorithm_running():
     """Check if line tracking or obstacle avoidance is running"""
     line_tracking_pid = Path("/tmp/line_follow.pid")
@@ -386,6 +401,10 @@ def handle_line_tracking(command):
             except (ValueError, OSError):
                 PID_FILE.unlink()
         
+        # IMPORTANT: Release IR sensors so line_follow.py can use them
+        release_infrared()
+        time.sleep(0.5)  # Give GPIO time to fully release
+        
         # Start line following script
         script = BASE_DIR / "line_follow.py"
         try:
@@ -549,6 +568,10 @@ def handle_obstacle_avoidance(command):
                     PID_FILE.unlink()
             except (ValueError, OSError):
                 PID_FILE.unlink()
+        
+        # IMPORTANT: Release IR sensors so obstacle_navigator.py has full GPIO access
+        release_infrared()
+        time.sleep(0.5)  # Give GPIO time to fully release
         
         # Start obstacle navigator script
         script = BASE_DIR / "obstacle_navigator.py"
