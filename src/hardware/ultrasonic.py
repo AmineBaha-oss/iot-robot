@@ -1,6 +1,7 @@
 from gpiozero import DistanceSensor, PWMSoftwareFallback, DistanceSensorNoEcho
 import warnings
 import time
+import os
 
 class Ultrasonic:
     def __init__(self, trigger_pin: int = 27, echo_pin: int = 22, max_distance: float = 3.0):
@@ -11,19 +12,53 @@ class Ultrasonic:
         self.echo_pin = echo_pin        # Set the echo pin number
         self.max_distance = max_distance  # Set the maximum distance
         
-        # Try to initialize with retries (GPIO might be busy)
-        max_retries = 3
+        # Try to initialize with retries (GPIO might be busy or need time to initialize)
+        max_retries = 5
         last_error = None
+        
+        # First, try to ensure GPIO pins are not in use by checking /sys/class/gpio
+        # Give a small delay to let any previous processes release GPIO
+        time.sleep(0.2)
+        
         for attempt in range(max_retries):
             try:
-                self.sensor = DistanceSensor(echo=self.echo_pin, trigger=self.trigger_pin, max_distance=self.max_distance)
-                # Test if sensor is working
-                _ = self.sensor.distance
+                # Try to initialize the sensor
+                self.sensor = DistanceSensor(
+                    echo=self.echo_pin, 
+                    trigger=self.trigger_pin, 
+                    max_distance=self.max_distance,
+                    queue_len=1  # Reduce queue length for faster response
+                )
+                # Small delay to let sensor initialize
+                time.sleep(0.1)
+                # Test if sensor is working by reading distance once
+                try:
+                    _ = self.sensor.distance
+                except:
+                    pass  # First read might fail, that's okay
                 break  # Success
+            except RuntimeError as e:
+                last_error = e
+                error_msg = str(e).lower()
+                if "edge detection" in error_msg or "gpio" in error_msg:
+                    # GPIO conflict - wait longer and retry
+                    wait_time = 0.5 * (attempt + 1)  # Increasing wait time
+                    if attempt < max_retries - 1:
+                        print(f"[ultrasonic] GPIO busy, waiting {wait_time:.1f}s before retry {attempt + 1}/{max_retries}...")
+                        time.sleep(wait_time)
+                    else:
+                        raise RuntimeError(f"Failed to initialize ultrasonic sensor: GPIO pins {self.trigger_pin}/{self.echo_pin} are busy or not available. Error: {last_error}")
+                else:
+                    # Other error, retry with shorter delay
+                    if attempt < max_retries - 1:
+                        time.sleep(0.3)
+                    else:
+                        raise RuntimeError(f"Failed to initialize ultrasonic sensor after {max_retries} attempts: {last_error}")
             except Exception as e:
                 last_error = e
                 if attempt < max_retries - 1:
-                    time.sleep(0.3)  # Wait before retry
+                    print(f"[ultrasonic] Initialization attempt {attempt + 1} failed: {e}, retrying...")
+                    time.sleep(0.3)
                 else:
                     raise RuntimeError(f"Failed to initialize ultrasonic sensor after {max_retries} attempts: {last_error}")
 
