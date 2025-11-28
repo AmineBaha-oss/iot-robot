@@ -1,10 +1,19 @@
 #!/usr/bin/env python3
 import time
+import sys
 from pathlib import Path
+
+# Add parent directory to path to import hardware modules
+BASE = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(BASE))
+
 try:
-    from ultrasonic import Ultrasonic
+    from hardware.ultrasonic import Ultrasonic
 except Exception as e:
-    print("Ultrasonic import failed:", e); raise
+    print(f"Ultrasonic import failed: {e}")
+    print(f"Looking for module in: {BASE}")
+    raise
+
 OUT = Path("/tmp/ultra_cm.txt")
 def main():
     u = Ultrasonic()
