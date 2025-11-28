@@ -119,16 +119,18 @@ def sync_to_cloud():
     """Sync unsynced records to cloud database (Neon.com)"""
     cloud_db_url = os.environ.get("DATABASE_URL", "")
     if not cloud_db_url:
-        print("No DATABASE_URL set, skipping cloud sync")
+        print("No DATABASE_URL set, skipping cloud sync", file=sys.stderr)
         return False
     
     unsynced = get_unsynced_records()
     if not unsynced:
         return True
     
+    print(f"[sync] Found {len(unsynced)} unsynced records to sync", file=sys.stderr)
+    
     conn, error = get_cloud_connection()
     if conn is None:
-        print(f"Failed to connect to cloud database: {error}")
+        print(f"[sync] Failed to connect to cloud database: {error}", file=sys.stderr)
         return False
     
     try:
@@ -206,6 +208,7 @@ def sync_to_cloud():
             return True
         
         # Use ON CONFLICT - try constraint name first, then column list
+        inserted_count = 0
         try:
             # Try with constraint name first
             execute_values(
@@ -216,6 +219,8 @@ def sync_to_cloud():
                    DO NOTHING''',
                 records
             )
+            inserted_count = c.rowcount
+            print(f"[sync] Inserted {inserted_count} records (constraint method)", file=sys.stderr)
         except Exception as e1:
             # Fallback: use column list (works with unique index too)
             # This handles cases where constraint doesn't exist or has different name
@@ -228,22 +233,29 @@ def sync_to_cloud():
                        DO NOTHING''',
                     records
                 )
+                inserted_count = c.rowcount
+                print(f"[sync] Inserted {inserted_count} records (column list method)", file=sys.stderr)
             except Exception as e2:
-                print(f"Error inserting records (constraint): {e1}")
-                print(f"Error inserting records (column list): {e2}")
+                print(f"[sync] ERROR inserting records (constraint): {e1}", file=sys.stderr)
+                print(f"[sync] ERROR inserting records (column list): {e2}", file=sys.stderr)
+                import traceback
+                print(f"[sync] Traceback: {traceback.format_exc()}", file=sys.stderr)
                 conn.rollback()
                 conn.close()
                 return False
         
         conn.commit()
-        conn.close()
         
         # Mark as synced only if insert was successful
-        record_ids = [r[0] for r in unsynced[:len(records)]]
+        # Mark all records that were prepared (even if some were duplicates and not inserted)
+        record_ids = [r[0] for r in unsynced]
         if record_ids:
             mark_as_synced(record_ids)
+            print(f"[sync] Marked {len(record_ids)} records as synced", file=sys.stderr)
         
-        print(f"Synced {len(records)} records to cloud")
+        conn.close()
+        
+        print(f"[sync] Successfully synced {len(records)} records to cloud (inserted: {inserted_count}, duplicates skipped: {len(records) - inserted_count}) at {datetime.now().strftime('%H:%M:%S')}", file=sys.stderr)
         return True
     except Exception as e:
         print(f"Error syncing to cloud: {e}")

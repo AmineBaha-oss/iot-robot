@@ -79,8 +79,11 @@ init_local_db()
 # Database Functions
 # ============================================================================
 
-def get_historical_data(date_str):
-    """Get historical data for a specific date from cloud DB (Neon.com) or local DB fallback"""
+def get_historical_data(date_str=None):
+    """Get historical data from cloud DB (Neon.com) or local DB fallback
+    If date_str is None, returns ALL historical data
+    If date_str is provided, returns data for that specific date only
+    """
     # Try cloud database first (for Render.com deployment)
     if CLOUD_DB_URL:
         conn, error = get_cloud_connection()
@@ -88,43 +91,72 @@ def get_historical_data(date_str):
             try:
                 from psycopg2.extras import RealDictCursor
                 c = conn.cursor(cursor_factory=RealDictCursor)
-                # Query by date (PostgreSQL)
-                c.execute('''
-                    SELECT timestamp, ultrasonic_cm, ir_left, ir_center, ir_right, line_state
-                    FROM sensor_data
-                    WHERE DATE(timestamp) = %s
-                    ORDER BY timestamp
-                ''', (date_str,))
+                
+                # Query by date if provided, otherwise get all data
+                if date_str:
+                    # Support both date formats: YYYY-MM-DD and full datetime
+                    c.execute('''
+                        SELECT timestamp, ultrasonic_cm, ir_left, ir_center, ir_right, line_state
+                        FROM sensor_data
+                        WHERE DATE(timestamp) = %s
+                        ORDER BY timestamp ASC
+                    ''', (date_str,))
+                else:
+                    # Get ALL historical data (most recent first, or oldest first?)
+                    # Using ASC to show chronological order
+                    c.execute('''
+                        SELECT timestamp, ultrasonic_cm, ir_left, ir_center, ir_right, line_state
+                        FROM sensor_data
+                        ORDER BY timestamp ASC
+                    ''')
+                
                 records = c.fetchall()
                 conn.close()
+                print(f"[app] Retrieved {len(records)} records from cloud DB (date: {date_str or 'ALL'})", file=sys.stderr)
                 # Convert to list of tuples for compatibility
-                return [(r['timestamp'], r['ultrasonic_cm'], r['ir_left'], r['ir_center'], r['ir_right'], r['line_state']) 
+                result = [(r['timestamp'], r['ultrasonic_cm'], r['ir_left'], r['ir_center'], r['ir_right'], r['line_state']) 
                         for r in records]
+                if len(result) == 0:
+                    print(f"[app] WARNING: No records found in cloud DB for date: {date_str or 'ALL'}", file=sys.stderr)
+                return result
             except Exception as e:
-                print(f"Error getting historical data from cloud DB: {e}")
+                print(f"[app] ERROR getting historical data from cloud DB: {e}", file=sys.stderr)
+                import traceback
+                print(f"[app] Traceback: {traceback.format_exc()}", file=sys.stderr)
                 try:
                     conn.close()
                 except:
                     pass
                 # Fall through to local DB
         else:
-            print(f"Could not connect to cloud DB: {error}")
+            print(f"[app] Could not connect to cloud DB: {error}", file=sys.stderr)
     
     # Fallback to local DB (for local development or if cloud fails)
     try:
         conn = sqlite3.connect(LOCAL_DB)
         c = conn.cursor()
-        c.execute('''
-            SELECT timestamp, ultrasonic_cm, ir_left, ir_center, ir_right, line_state
-            FROM sensor_data
-            WHERE date(timestamp) = date(?)
-            ORDER BY timestamp
-        ''', (date_str,))
+        
+        if date_str:
+            c.execute('''
+                SELECT timestamp, ultrasonic_cm, ir_left, ir_center, ir_right, line_state
+                FROM sensor_data
+                WHERE date(timestamp) = date(?)
+                ORDER BY timestamp
+            ''', (date_str,))
+        else:
+            # Get ALL historical data
+            c.execute('''
+                SELECT timestamp, ultrasonic_cm, ir_left, ir_center, ir_right, line_state
+                FROM sensor_data
+                ORDER BY timestamp
+            ''')
+        
         records = c.fetchall()
         conn.close()
+        print(f"[app] Retrieved {len(records)} records from local DB (date: {date_str or 'ALL'})")
         return records
     except Exception as e:
-        print(f"Error getting historical data from local DB: {e}")
+        print(f"[app] Error getting historical data from local DB: {e}", file=sys.stderr)
         return []
 
 # ============================================================================
@@ -249,15 +281,12 @@ def api_live_data():
 
 @app.route('/api/historical-data', methods=['POST'])
 def api_historical_data():
-    """Get historical sensor data for a specific date"""
+    """Get historical sensor data for a specific date (or all data if no date provided)"""
     try:
         if not request.json:
             return jsonify({"error": "JSON body required"}), 400
         
-        date_str = request.json.get('date')
-        if not date_str:
-            return jsonify({"error": "Date required"}), 400
-        
+        date_str = request.json.get('date')  # Optional - if None, returns all data
         records = get_historical_data(date_str)
         data = {
             "timestamps": [r[0] for r in records],

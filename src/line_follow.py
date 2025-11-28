@@ -31,14 +31,48 @@ from hardware.infrared import Infrared
 def clamp(x, lo, hi): 
     return lo if x < lo else hi if x > hi else x
 
+IR_CACHE = Path('/tmp/ir_lmr.txt')
+
 def read_triplet(ir, order, active_low):
-    L = ir.read_one_infrared(order[0])
-    M = ir.read_one_infrared(order[1])
-    R = ir.read_one_infrared(order[2])
-    # Normalize so 1 = sees black line, 0 = background
-    if active_low:
-        L, M, R = (1-L), (1-M), (1-R)
-    return L, M, R
+    """Read IR sensors - try cache first, fallback to GPIO"""
+    # Try reading from cache first (if telemetry/other process is writing to it)
+    try:
+        if IR_CACHE.exists() and (time.time() - IR_CACHE.stat().st_mtime) <= 2.5:
+            cached_text = IR_CACHE.read_text().strip()
+            parts = cached_text.replace(",", " ").split()
+            if len(parts) >= 3:
+                L, M, R = int(parts[0]), int(parts[1]), int(parts[2])
+                # Normalize so 1 = sees black line, 0 = background
+                if active_low:
+                    L, M, R = (1-L), (1-M), (1-R)
+                return L, M, R
+    except Exception:
+        pass
+    
+    # Fallback to direct GPIO access (if no cache available)
+    try:
+        L = ir.read_one_infrared(order[0])
+        M = ir.read_one_infrared(order[1])
+        R = ir.read_one_infrared(order[2])
+        # Normalize so 1 = sees black line, 0 = background
+        if active_low:
+            L, M, R = (1-L), (1-M), (1-R)
+        return L, M, R
+    except Exception as e:
+        # If GPIO access fails (e.g., resource busy), try cache again
+        try:
+            if IR_CACHE.exists():
+                cached_text = IR_CACHE.read_text().strip()
+                parts = cached_text.replace(",", " ").split()
+                if len(parts) >= 3:
+                    L, M, R = int(parts[0]), int(parts[1]), int(parts[2])
+                    if active_low:
+                        L, M, R = (1-L), (1-M), (1-R)
+                    return L, M, R
+        except Exception:
+            pass
+        # Last resort: return all zeros (no line detected)
+        return 0, 0, 0
 
 def main():
     ap = argparse.ArgumentParser(description="PD centering with turn-priority + pivot, coast-on-loss")
@@ -83,7 +117,20 @@ def main():
     drive_sign = -1.0 if args.invert_drive else 1.0
 
     car = Ordinary_Car()
-    ir  = Infrared()
+    
+    # Try to initialize IR sensor, but fall back to cache-only mode if GPIO is busy
+    ir = None
+    try:
+        ir = Infrared()
+        print("[LINE] IR sensors initialized (GPIO mode)")
+    except Exception as e:
+        print(f"[LINE] Warning: Could not initialize IR sensors (GPIO busy?): {e}")
+        print("[LINE] Will use cache-only mode (reading from /tmp/ir_lmr.txt)")
+        # Create a dummy object that will be ignored (read_triplet will use cache)
+        class DummyInfrared:
+            def read_one_infrared(self, channel): return 0
+        ir = DummyInfrared()
+    
     t_prev = 0.0
     last_err = 0.0
     loss_count = 0
