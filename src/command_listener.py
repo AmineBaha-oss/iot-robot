@@ -330,6 +330,15 @@ def handle_line_tracking(command):
         except Exception as e:
             print(f"[DEBUG] Error verifying stop: {e}")
         
+        # Always stop motors when stopping line tracking
+        try:
+            car = get_car()
+            if car:
+                car.set_motor_model(0, 0, 0, 0)
+                print("[DEBUG] Motors stopped")
+        except Exception as e:
+            print(f"[DEBUG] Error stopping motors: {e}")
+        
         if stopped:
             print("✅ Line tracking stopped")
         else:
@@ -369,15 +378,14 @@ def handle_obstacle_avoidance(command):
             # Save PID
             PID_FILE.write_text(str(process.pid))
             
-            # Check if it started successfully (wait a bit to see if it crashes immediately)
-            time.sleep(0.5)
+            # Check if it started successfully (wait a bit longer)
+            time.sleep(1.0)
             if process.poll() is not None:
-                # Process already exited (crashed)
-                stdout, stderr = process.communicate()
-                print(f"Obstacle avoidance failed to start: {stderr}")
+                # Process died immediately
+                print(f"❌ Obstacle avoidance failed to start (PID {process.pid} exited immediately)")
                 PID_FILE.unlink()
             else:
-                print("Obstacle avoidance started")
+                print(f"✅ Obstacle avoidance started (PID: {process.pid})")
         except Exception as e:
             print(f"Error starting obstacle avoidance: {e}")
             if PID_FILE.exists():
@@ -477,6 +485,15 @@ def handle_obstacle_avoidance(command):
                 stopped = True
         except:
             pass
+        
+        # Always stop motors when stopping obstacle avoidance
+        try:
+            car = get_car()
+            if car:
+                car.set_motor_model(0, 0, 0, 0)
+                print("[DEBUG] Motors stopped")
+        except Exception as e:
+            print(f"[DEBUG] Error stopping motors: {e}")
         
         if stopped:
             print("✅ Obstacle avoidance stopped")

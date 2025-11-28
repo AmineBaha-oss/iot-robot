@@ -35,7 +35,7 @@ def load_cfg():
     if override_path and Path(override_path).exists():
         cfg = json.loads(Path(override_path).read_text())
     else:
-        cfg = json.loads((BASE/"adafruit.json").read_text())
+    cfg = json.loads((BASE/"adafruit.json").read_text())
     a = cfg["adafruit"] if "adafruit" in cfg else cfg
     username = a.get("username") or a.get("user")
     key      = a.get("key") or a.get("aio_key")
@@ -205,11 +205,8 @@ class Telemetry:
                     self.t_us = t
                     d = read_ultra_cached()
                     if d is not None:
+                        self.last_ultrasonic = float(d)  # Store last known value
                         self.pub.pub(self.feeds["ultrasonic_cm"], f"{d:.1f}")
-                        # Save to local database
-                        if DB_AVAILABLE:
-                            timestamp = datetime.datetime.now().isoformat()
-                            save_to_local_db(timestamp=timestamp, ultrasonic=float(d))
 
                 # Infrared from cache
                 if t - self.t_ir >= self.dt_ir:
@@ -222,10 +219,11 @@ class Telemetry:
                         self.pub.pub(self.feeds["ir_right"],  R)
                         line_state = f"{'L' if L else '_'}{'M' if M else '_'}{'R' if R else '_'}"
                         self.pub.pub(self.feeds["line_state"], line_state)
-                        # Save to local database
+                        # Save to local database with both IR and ultrasonic (use last known ultrasonic)
                         if DB_AVAILABLE:
                             timestamp = datetime.datetime.now().isoformat()
-                            d = read_ultra_cached()
+                            # Use last known ultrasonic value if available
+                            d = read_ultra_cached() or self.last_ultrasonic
                             save_to_local_db(
                                 timestamp=timestamp,
                                 ultrasonic=float(d) if d is not None else None,
@@ -234,6 +232,14 @@ class Telemetry:
                                 ir_right=int(R) if R is not None else None,
                                 line_state=line_state if line_state else None
                             )
+                
+                # Also save ultrasonic-only records periodically (but less frequently)
+                # This ensures we have ultrasonic data even when IR sensors aren't active
+                if DB_AVAILABLE and self.last_ultrasonic is not None and (t - self.t_us) < self.dt_us * 0.5:
+                    # Only save if we have fresh ultrasonic and haven't saved IR recently
+                    if (t - self.t_ir) >= self.dt_ir * 0.8:  # Save ultrasonic if IR hasn't been read recently
+                        timestamp = datetime.datetime.now().isoformat()
+                        save_to_local_db(timestamp=timestamp, ultrasonic=float(self.last_ultrasonic))
 
                 # Camera (optional, non-GPIO)
                 if t - self.t_cam >= self.dt_cam:
@@ -253,12 +259,17 @@ class Telemetry:
                     else: L=M=R=""; line_state="___"
                     self.log.log(d, L, M, R, line_state, (self.cam.status() if self.cam else "offline"))
 
-                # Sync local database to cloud every 5 minutes (300 seconds)
-                if DB_AVAILABLE and (t - self.t_sync >= 300):
+                # Sync local database to cloud every 30 seconds (faster updates)
+                if DB_AVAILABLE and (t - self.t_sync >= 30):
                     self.t_sync = t
                     if check_internet():
-                        sync_to_cloud()
-                        print("[telemetry] synced local database to cloud", file=sys.stderr)
+                        result = sync_to_cloud()
+                        if result:
+                            print(f"[telemetry] synced local database to cloud at {datetime.datetime.now().strftime('%H:%M:%S')}", file=sys.stderr)
+                        else:
+                            print(f"[telemetry] WARNING: cloud sync failed at {datetime.datetime.now().strftime('%H:%M:%S')}", file=sys.stderr)
+                    else:
+                        print("[telemetry] No internet connection, skipping cloud sync", file=sys.stderr)
 
                 time.sleep(0.05)
         except KeyboardInterrupt:
