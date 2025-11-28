@@ -164,10 +164,39 @@ class HeadUltrasonicNavigator:
         self.car.set_motor_model(+pw,+pw,-pw,-pw); time.sleep(dur); self.stop()
 
     # sensing
+    ULTRA_CACHE = Path("/tmp/ultra_cm.txt")
+    
     def _read_cm(self)->Optional[float]:
-        d=self.us.get_distance()
-        if d is None or d<=0 or d>400: return None
-        return d
+        # Try reading from cache first (if telemetry/ultra_cache_writer is running)
+        # This avoids GPIO conflicts when multiple processes need ultrasonic data
+        try:
+            if self.ULTRA_CACHE.exists() and (time.time() - self.ULTRA_CACHE.stat().st_mtime) <= 2.5:
+                cached_d = float(self.ULTRA_CACHE.read_text().strip())
+                if cached_d and cached_d > 0 and cached_d <= 400:
+                    return cached_d
+        except Exception:
+            pass
+        
+        # Fallback to direct GPIO access (if no cache available)
+        try:
+            d=self.us.get_distance()
+            if d is None or d<=0 or d>400: return None
+            # Write to cache for other processes (telemetry)
+            try:
+                self.ULTRA_CACHE.write_text(f"{d:.1f}")
+            except Exception:
+                pass
+            return d
+        except Exception as e:
+            # If GPIO access fails (e.g., resource busy), try cache again
+            try:
+                if self.ULTRA_CACHE.exists():
+                    cached_d = float(self.ULTRA_CACHE.read_text().strip())
+                    if cached_d and cached_d > 0 and cached_d <= 400:
+                        return cached_d
+            except Exception:
+                pass
+            return None
     def _avg_cm(self,n=2,delay=0.0)->float:
         vals=[]
         for _ in range(n):
@@ -180,6 +209,7 @@ class HeadUltrasonicNavigator:
         cur_p, cur_t = self.ps.pos, self.to.pos
         self.pan.angle(int(clamp(pan_deg, self.pan.min_deg, self.pan.max_deg)))
         self.tilt.angle(int(clamp(tilt_deg, self.tilt.min_deg, self.tilt.max_deg)))
+        # Use _read_cm which now checks cache first
         d=self._avg_cm(n=2,delay=0.0)
         # return to sweep immediately
         self.pan.angle(cur_p); self.tilt.angle(cur_t)
