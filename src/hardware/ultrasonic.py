@@ -10,7 +10,22 @@ class Ultrasonic:
         self.trigger_pin = trigger_pin  # Set the trigger pin number
         self.echo_pin = echo_pin        # Set the echo pin number
         self.max_distance = max_distance  # Set the maximum distance
-        self.sensor = DistanceSensor(echo=self.echo_pin, trigger=self.trigger_pin, max_distance=self.max_distance)  # Initialize the distance sensor
+        
+        # Try to initialize with retries (GPIO might be busy)
+        max_retries = 3
+        last_error = None
+        for attempt in range(max_retries):
+            try:
+                self.sensor = DistanceSensor(echo=self.echo_pin, trigger=self.trigger_pin, max_distance=self.max_distance)
+                # Test if sensor is working
+                _ = self.sensor.distance
+                break  # Success
+            except Exception as e:
+                last_error = e
+                if attempt < max_retries - 1:
+                    time.sleep(0.3)  # Wait before retry
+                else:
+                    raise RuntimeError(f"Failed to initialize ultrasonic sensor after {max_retries} attempts: {last_error}")
 
     def __enter__(self):
         return self

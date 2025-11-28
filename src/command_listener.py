@@ -121,10 +121,23 @@ def get_ultrasonic():
     if _ultrasonic_instance is None:
         try:
             from hardware.ultrasonic import Ultrasonic
-            _ultrasonic_instance = Ultrasonic()
-            print("[sensor_cache] Ultrasonic sensor initialized")
+            # Try multiple times with delay (GPIO might be busy)
+            max_retries = 3
+            for attempt in range(max_retries):
+                try:
+                    _ultrasonic_instance = Ultrasonic()
+                    print("[sensor_cache] Ultrasonic sensor initialized")
+                    break
+                except Exception as e:
+                    if attempt < max_retries - 1:
+                        print(f"[sensor_cache] Ultrasonic init attempt {attempt + 1} failed: {e}, retrying...")
+                        time.sleep(0.5)  # Wait before retry
+                    else:
+                        print(f"[sensor_cache] Error creating ultrasonic sensor after {max_retries} attempts: {e}")
+                        # Don't set to None, keep trying on next call
+                        return None
         except Exception as e:
-            print(f"[sensor_cache] Error creating ultrasonic sensor: {e}")
+            print(f"[sensor_cache] Error importing ultrasonic module: {e}")
     return _ultrasonic_instance
 
 def get_infrared():
@@ -174,9 +187,20 @@ def write_sensor_cache():
     ultrasonic = get_ultrasonic()
     infrared = get_infrared()
     
-    if not ultrasonic or not infrared:
-        print("[sensor_cache] Warning: Sensors not available, cache writing disabled")
+    # Continue even if one sensor fails - write cache for available sensors
+    if not ultrasonic and not infrared:
+        print("[sensor_cache] Warning: No sensors available, cache writing disabled")
         return
+    
+    if ultrasonic:
+        print("[sensor_cache] Ultrasonic sensor available")
+    else:
+        print("[sensor_cache] Ultrasonic sensor not available (will use cache from algorithms)")
+    
+    if infrared:
+        print("[sensor_cache] IR sensors available")
+    else:
+        print("[sensor_cache] IR sensors not available (will use cache from algorithms)")
     
     print("[sensor_cache] Starting sensor cache writer thread...")
     print("[sensor_cache] Will read GPIO only when algorithms are NOT running")
@@ -197,8 +221,8 @@ def write_sensor_cache():
             if not algorithms_running:
                 # No algorithms running - we can safely read GPIO and write to cache
                 
-                # Read and write ultrasonic sensor
-                if t - last_ultra_time >= ultra_interval:
+                # Read and write ultrasonic sensor (if available)
+                if ultrasonic and t - last_ultra_time >= ultra_interval:
                     try:
                         distance = ultrasonic.get_distance()
                         if distance is not None and distance > 0 and distance <= 400:
@@ -208,8 +232,8 @@ def write_sensor_cache():
                         # GPIO might be busy, skip this cycle
                         pass
                 
-                # Read and write IR sensors
-                if t - last_ir_time >= ir_interval:
+                # Read and write IR sensors (if available)
+                if infrared and t - last_ir_time >= ir_interval:
                     try:
                         L = infrared.read_one_infrared(1)  # Channel 1 = Left
                         M = infrared.read_one_infrared(2)  # Channel 2 = Center
