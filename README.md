@@ -8,7 +8,7 @@ IoT Smart Mobile Robot (Raspberry Pi) — Complete IoT system with telemetry, au
 
 ---
 
-## 🎓 Milestone 3 - Submission Information
+##  Milestone 3 - Submission Information
 
 ### Team Members
 
