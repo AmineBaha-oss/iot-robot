@@ -1,5 +1,4 @@
-{% extends "base.html" %} 
-{% block title %}Dashboard - YVLSWITCH{% endblock %}
+{% extends "base.html" %} {% block title %}Dashboard - YVLSWITCH{% endblock %}
 {% block content %}
 <div class="container">
   <h1 class="page-title">System Dashboard</h1>
@@ -53,6 +52,49 @@
       </div>
     </div>
 
+    <!-- Camera Motion (Sensor 3) -->
+    <div class="card">
+      <div class="card-header">
+        <h3>📷 Camera Feed</h3>
+      </div>
+      <div class="card-body">
+        <div style="text-align: center; margin-top: 10px">
+          <img
+            id="camera-motion-image"
+            src=""
+            alt="Camera Feed"
+            style="
+              max-width: 100%;
+              max-height: 250px;
+              border-radius: 8px;
+              border: 2px solid var(--neon-cyan);
+              display: none;
+              cursor: pointer;
+              box-shadow: 0 0 15px rgba(0, 245, 255, 0.4);
+            "
+            onclick="showCameraModal(this.src)"
+          />
+          <div
+            id="camera-motion-placeholder"
+            style="
+              padding: 20px;
+              color: var(--text-secondary);
+              font-size: 0.9em;
+            "
+          >
+            No camera feed available
+          </div>
+        </div>
+        <div
+          class="sensor-update"
+          id="camera-motion-update"
+          style="margin-top: 10px"
+        >
+          awaiting data...
+        </div>
+      </div>
+    </div>
+
     <!-- Line State -->
     <div class="card">
       <div class="card-header">
@@ -73,7 +115,9 @@
       <div class="card-body">
         <div class="status-item">
           <span class="status-label">Connection Status</span>
-          <span class="status-value" id="connection-status">INITIALIZING...</span>
+          <span class="status-value" id="connection-status"
+            >INITIALIZING...</span
+          >
         </div>
         <div class="status-item">
           <span class="status-label">Last Data Sync</span>
@@ -91,16 +135,24 @@
   <div class="quick-actions">
     <h2>◆ Quick Actions</h2>
     <div class="action-buttons">
-      <a href="{{ url_for('sensor_data') }}" class="btn btn-primary btn-large">View Sensors</a>
-      <a href="{{ url_for('control_car') }}" class="btn btn-secondary btn-large">Control Car</a>
-      <a href="{{ url_for('line_tracking') }}" class="btn btn-success btn-large">Line Tracking</a>
-      <a href="{{ url_for('obstacle_avoidance') }}" class="btn btn-warning btn-large">Obstacle Avoid</a>
+      <a href="{{ url_for('sensor_data') }}" class="btn btn-primary btn-large"
+        >View Sensors</a
+      >
+      <a href="{{ url_for('control_car') }}" class="btn btn-secondary btn-large"
+        >Control Car</a
+      >
+      <a href="{{ url_for('line_tracking') }}" class="btn btn-success btn-large"
+        >Line Tracking</a
+      >
+      <a
+        href="{{ url_for('obstacle_avoidance') }}"
+        class="btn btn-warning btn-large"
+        >Obstacle Avoid</a
+      >
     </div>
   </div>
 </div>
-{% endblock %} 
-
-{% block scripts %}
+{% endblock %} {% block scripts %}
 <script>
   function updateLiveData() {
     fetch("/api/live-data")
@@ -108,44 +160,107 @@
       .then((data) => {
         // Update ultrasonic
         if (data.ultrasonic_cm !== null && data.ultrasonic_cm !== undefined) {
-          document.getElementById("ultrasonic-value").textContent = parseFloat(data.ultrasonic_cm).toFixed(1);
-          document.getElementById("ultrasonic-update").textContent = "LIVE @ " + new Date().toLocaleTimeString();
+          document.getElementById("ultrasonic-value").textContent = parseFloat(
+            data.ultrasonic_cm
+          ).toFixed(1);
+          document.getElementById("ultrasonic-update").textContent =
+            "LIVE @ " + new Date().toLocaleTimeString();
         }
 
         // Update IR sensors
         if (data.ir_left !== null && data.ir_left !== undefined) {
           document.getElementById("ir-left-value").textContent = data.ir_left;
-          document.getElementById("ir-left-update").textContent = "LIVE @ " + new Date().toLocaleTimeString();
+          document.getElementById("ir-left-update").textContent =
+            "LIVE @ " + new Date().toLocaleTimeString();
         }
         if (data.ir_center !== null && data.ir_center !== undefined) {
-          document.getElementById("ir-center-value").textContent = data.ir_center;
-          document.getElementById("ir-center-update").textContent = "LIVE @ " + new Date().toLocaleTimeString();
+          document.getElementById("ir-center-value").textContent =
+            data.ir_center;
+          document.getElementById("ir-center-update").textContent =
+            "LIVE @ " + new Date().toLocaleTimeString();
         }
         if (data.ir_right !== null && data.ir_right !== undefined) {
           document.getElementById("ir-right-value").textContent = data.ir_right;
-          document.getElementById("ir-right-update").textContent = "LIVE @ " + new Date().toLocaleTimeString();
+          document.getElementById("ir-right-update").textContent =
+            "LIVE @ " + new Date().toLocaleTimeString();
+        }
+
+        // Update camera thumbnail (Sensor 3) - image from camera_motion feed
+        const cameraImg = document.getElementById("camera-motion-image");
+        const cameraPlaceholder = document.getElementById(
+          "camera-motion-placeholder"
+        );
+
+        // Check if camera_motion contains base64 image data
+        // Base64 images are typically long strings (100+ chars) and contain base64 characters
+        function isBase64Image(str) {
+          if (!str || typeof str !== "string") return false;
+          const trimmed = str.trim();
+          // Base64 images are usually long (at least 100 characters for a small thumbnail)
+          if (trimmed.length < 50) return false;
+          // Check if it contains base64 characters (A-Z, a-z, 0-9, +, /, =)
+          // and doesn't look like a simple number
+          const base64Pattern = /^[A-Za-z0-9+/=]+$/;
+          const isNumeric = /^\d+\.?\d*$/.test(trimmed);
+          return base64Pattern.test(trimmed) && !isNumeric;
+        }
+
+        if (data.camera_motion && isBase64Image(data.camera_motion)) {
+          // camera_motion contains base64 image data
+          cameraImg.src = "data:image/jpeg;base64," + data.camera_motion.trim();
+          cameraImg.style.display = "block";
+          cameraPlaceholder.style.display = "none";
+          document.getElementById("camera-motion-update").textContent =
+            "LIVE @ " + new Date().toLocaleTimeString();
+        } else {
+          // No valid image data
+          cameraImg.style.display = "none";
+          cameraPlaceholder.style.display = "block";
         }
 
         // Update line state
         if (data.line_state !== null && data.line_state !== undefined) {
-          document.getElementById("line-state-value").textContent = data.line_state || "---";
-          document.getElementById("line-state-update").textContent = "LIVE @ " + new Date().toLocaleTimeString();
+          document.getElementById("line-state-value").textContent =
+            data.line_state || "---";
+          document.getElementById("line-state-update").textContent =
+            "LIVE @ " + new Date().toLocaleTimeString();
         }
 
         // Update connection status
         document.getElementById("connection-status").textContent = "ONLINE";
-        document.getElementById("connection-status").className = "status-value status-connected";
-        document.getElementById("last-update").textContent = new Date().toLocaleString();
+        document.getElementById("connection-status").className =
+          "status-value status-connected";
+        document.getElementById("last-update").textContent =
+          new Date().toLocaleString();
       })
       .catch((error) => {
         console.error("Error fetching live data:", error);
         document.getElementById("connection-status").textContent = "OFFLINE";
-        document.getElementById("connection-status").className = "status-value status-disconnected";
+        document.getElementById("connection-status").className =
+          "status-value status-disconnected";
       });
   }
 
   // Update immediately and then every 2 seconds
   updateLiveData();
   setInterval(updateLiveData, 2000);
+
+  // Camera modal for full-size view
+  function showCameraModal(imgSrc) {
+    // Create modal overlay
+    const modal = document.createElement("div");
+    modal.style.cssText =
+      "position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.9); z-index: 10000; display: flex; align-items: center; justify-content: center; cursor: pointer;";
+    modal.onclick = () => document.body.removeChild(modal);
+
+    // Create image
+    const img = document.createElement("img");
+    img.src = imgSrc;
+    img.style.cssText =
+      "max-width: 90%; max-height: 90%; border-radius: 8px; border: 3px solid var(--neon-cyan); box-shadow: 0 0 30px rgba(0, 245, 255, 0.5);";
+
+    modal.appendChild(img);
+    document.body.appendChild(modal);
+  }
 </script>
 {% endblock %}

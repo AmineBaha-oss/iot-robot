@@ -39,8 +39,9 @@ IoT Smart Mobile Robot (Raspberry Pi) — Complete IoT system with telemetry, au
 
 - Raspberry Pi 4B or Pi 5
 - Freenove 4WD Robot Car Kit
-- HC-SR04 Ultrasonic Sensor
-- 3-Channel IR Line Sensors
+- HC-SR04 Ultrasonic Sensor (Sensor 1)
+- 3-Channel IR Line Sensors (Sensor 2)
+- Raspberry Pi Camera Module (Sensor 3)
 - Pan/Tilt Servo Mount
 - WS281X LED Strip (optional)
 - Buzzer (optional)
@@ -100,7 +101,7 @@ pip install --upgrade pip
 pip install -r requirements.txt
 
 # Install additional hardware packages
-pip install smbus smbus2 spidev RPi.GPIO numpy
+pip install smbus smbus2 spidev RPi.GPIO numpy opencv-python
 ```
 
 ### Step 4: Configure Adafruit IO
@@ -217,12 +218,13 @@ pip install smbus smbus2 spidev RPi.GPIO
 
 ### Features
 
-- **Dashboard:** Real-time sensor data display
+- **Dashboard:** Real-time sensor data display with live camera feed
 - **Sensor Data:** Historical data charts with date selection
 - **Control Car:** Motor controls (Forward, Backward, Left, Right, Stop)
 - **Line Tracking:** Start/Stop autonomous line following
 - **Obstacle Avoidance:** Start/Stop autonomous navigation
 - **Device Control:** LED and Buzzer on/off
+- **Camera Feed:** Live camera thumbnail display (Sensor 3) with click-to-zoom
 
 ### Local Development
 
@@ -248,13 +250,26 @@ python app.py
 
 ### Sensor Feeds (Robot → Cloud)
 
+**Sensor 1: Ultrasonic Distance**
 | Feed Name        | Description         | Values            |
 | ---------------- | ------------------- | ----------------- |
 | `ultra-distance` | Ultrasonic distance | 0-400 cm          |
+
+**Sensor 2: Infrared Line Sensors**
+| Feed Name        | Description         | Values            |
+| ---------------- | ------------------- | ----------------- |
 | `line-ir-left`   | IR Left sensor      | 0 or 1            |
 | `line-ir-center` | IR Center sensor    | 0 or 1            |
 | `line-ir-right`  | IR Right sensor     | 0 or 1            |
 | `line-state`     | Combined line state | L, M, R, LM, etc. |
+
+**Sensor 3: Camera Feed**
+| Feed Name        | Description                    | Values            |
+| ---------------- | ------------------------------ | ----------------- |
+| `cam-motion`     | Camera thumbnail (base64 image) | JPEG image data (base64 encoded) |
+| `cam-status`     | Camera status                  | online/offline    |
+
+**Note:** The `cam-motion` feed contains the camera thumbnail as a base64-encoded JPEG image. The Flask web application automatically detects and displays this as a live camera feed on the dashboard.
 
 ### Control Feeds (Cloud → Robot)
 

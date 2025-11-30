@@ -10,6 +10,7 @@
       "line_state": "line-state",
       "camera_status": "cam-status",
       "camera_thumb": "cam-thumb",
+      "camera_motion": "cam-motion",
       "motor_control": "motor-control",
       "led_control": "led-control",
       "buzzer_control": "buzzer-control",

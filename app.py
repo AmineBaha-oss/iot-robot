@@ -251,6 +251,7 @@ def api_live_data():
         ir_center = get_adafruit_data("ir_center")
         ir_right = get_adafruit_data("ir_right")
         line_state = get_adafruit_data("line_state")
+        camera_motion = get_adafruit_data("camera_motion")  # Sensor 3: Camera motion detection
         timestamp = datetime.now().isoformat()
         
         # Save to local database (for offline storage) - only if we have data
@@ -272,6 +273,7 @@ def api_live_data():
             "ir_center": ir_center,
             "ir_right": ir_right,
             "line_state": line_state,
+            "camera_motion": camera_motion,  # Sensor 3: Camera thumbnail (base64 image)
             "timestamp": timestamp
         }
         return jsonify(data)

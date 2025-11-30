@@ -83,6 +83,7 @@ def read_ultra_cached(max_age=2.5) -> Optional[float]:
 class CamReader:
     def __init__(self):
         self.cap = None
+        self.prev_frame = None
         if cv2:
             try:
                 cap = cv2.VideoCapture(0)
@@ -103,6 +104,42 @@ class CamReader:
             ok, buf = cv2.imencode(".jpg", frame, [int(cv2.IMWRITE_JPEG_QUALITY), 60])
             if not ok: return None
             return base64.b64encode(buf.tobytes()).decode("ascii")
+        except Exception:
+            return None
+    def get_motion_value(self) -> Optional[float]:
+        """Get motion detection value (0-100) as Sensor 3 data"""
+        if not (self.cap and cv2): return None
+        try:
+            ok, frame = self.cap.read()
+            if not ok: return None
+            # Convert to grayscale for motion detection
+            gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+            # Resize for faster processing
+            gray = cv2.resize(gray, (160, 120))
+            if self.prev_frame is not None:
+                # Calculate frame difference
+                diff = cv2.absdiff(self.prev_frame, gray)
+                # Calculate motion percentage
+                motion_pixels = cv2.countNonZero(diff)
+                total_pixels = diff.shape[0] * diff.shape[1]
+                motion_percent = (motion_pixels / total_pixels) * 100.0
+                self.prev_frame = gray
+                return round(motion_percent, 2)
+            else:
+                # First frame, just store it
+                self.prev_frame = gray
+                return 0.0
+        except Exception:
+            return None
+    def get_brightness(self) -> Optional[float]:
+        """Get average brightness (0-255) as alternative sensor value"""
+        if not (self.cap and cv2): return None
+        try:
+            ok, frame = self.cap.read()
+            if not ok: return None
+            gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+            brightness = cv2.mean(gray)[0]
+            return round(brightness, 2)
         except Exception:
             return None
     def close(self):
@@ -241,15 +278,17 @@ class Telemetry:
                                 line_state=line_state if line_state else None
                             )
                 
-                # Camera (optional, non-GPIO)
+                # Camera (Sensor 3) - Send thumbnail image via camera_motion feed
                 if t - self.t_cam >= self.dt_cam:
                     self.t_cam = t
                     status = (self.cam.status() if self.cam else "offline")
                     self.pub.pub(self.feeds["camera_status"], status)
+                    # Send camera thumbnail (base64) to camera_motion feed
                     if self.cam:
                         thumb = self.cam.thumb_b64()
                         if thumb:
-                            self.pub.pub(self.feeds["camera_thumb"], thumb)
+                            # Send thumbnail base64 image to camera_motion feed
+                            self.pub.pub(self.feeds.get("camera_motion", "cam-motion"), thumb)
 
                 # Local CSV ~1Hz
                 if self.log and (int(t*10)%10 == 0):
