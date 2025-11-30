@@ -92,6 +92,15 @@
         >
           awaiting data...
         </div>
+        <div style="margin-top: 15px; text-align: center">
+          <button
+            class="btn btn-primary"
+            onclick="refreshCamera()"
+            style="padding: 10px 20px; font-size: 0.9em"
+          >
+            🔄 Refresh Camera
+          </button>
+        </div>
       </div>
     </div>
 
@@ -244,6 +253,25 @@
   // Update immediately and then every 2 seconds
   updateLiveData();
   setInterval(updateLiveData, 2000);
+
+  // Refresh camera button handler
+  function refreshCamera() {
+    const btn = event.target;
+    const originalText = btn.textContent;
+    btn.textContent = "Refreshing...";
+    btn.disabled = true;
+
+    // Force immediate refresh of camera feed
+    updateLiveData();
+
+    setTimeout(() => {
+      btn.textContent = "✓ Refreshed!";
+      setTimeout(() => {
+        btn.textContent = originalText;
+        btn.disabled = false;
+      }, 1000);
+    }, 500);
+  }
 
   // Camera modal for full-size view
   function showCameraModal(imgSrc) {

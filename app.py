@@ -281,6 +281,17 @@ def api_live_data():
         print(f"Error in api_live_data: {e}")
         return jsonify({"error": "Internal server error"}), 500
 
+@app.route('/api/capture-photo', methods=['POST'])
+def api_capture_photo():
+    """Refresh camera feed - camera captures automatically via telemetry"""
+    try:
+        # Just refresh the feed - camera is already capturing automatically
+        # This forces an immediate refresh of the image display
+        return jsonify({"status": "success", "message": "Refreshing camera feed..."})
+    except Exception as e:
+        print(f"Error in api_capture_photo: {e}")
+        return jsonify({"status": "error", "message": str(e)}), 500
+
 @app.route('/api/historical-data', methods=['POST'])
 def api_historical_data():
     """Get historical sensor data for a specific date (or all data if no date provided)"""
