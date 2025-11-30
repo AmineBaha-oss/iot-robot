@@ -153,11 +153,20 @@ class CamReader:
                 ok, frame = self.cap.read()
                 if not ok: return None
                 h, w = frame.shape[:2]
-                scale = width / float(w)
+                # Smaller size for Adafruit IO 1KB limit
+                scale = 80 / float(w)  # Smaller default width
                 frame = cv2.resize(frame, (int(w*scale), int(h*scale)))
-                ok, buf = cv2.imencode(".jpg", frame, [int(cv2.IMWRITE_JPEG_QUALITY), 60])
+                ok, buf = cv2.imencode(".jpg", frame, [int(cv2.IMWRITE_JPEG_QUALITY), 30])  # Lower quality
                 if not ok: return None
-                return base64.b64encode(buf.tobytes()).decode("ascii")
+                img_b64 = base64.b64encode(buf.tobytes()).decode("ascii")
+                # Check size - Adafruit IO limit is 1024 bytes
+                if len(img_b64) > 1000:  # Leave some margin
+                    # Try even smaller
+                    frame = cv2.resize(frame, (60, 45))
+                    ok, buf = cv2.imencode(".jpg", frame, [int(cv2.IMWRITE_JPEG_QUALITY), 25])
+                    if ok:
+                        img_b64 = base64.b64encode(buf.tobytes()).decode("ascii")
+                return img_b64
             except Exception:
                 return None
         return None
