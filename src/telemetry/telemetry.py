@@ -114,24 +114,36 @@ class CamReader:
                 self.cap = None
     def status(self) -> str:
         return "online" if (self.picam or self.cap) else "offline"
-    def thumb_b64(self, width=160) -> Optional[str]:
+    def thumb_b64(self, width=80, quality=40) -> Optional[str]:
         # Try picamera2 first
+        # Make smaller thumbnail to fit Adafruit IO 1KB limit
         if self.picam:
             try:
                 # Capture image (picamera2 returns PIL Image)
                 img = self.picam.capture_image()
-                # Resize using PIL
+                # Resize using PIL - smaller size for Adafruit IO limit
                 from PIL import Image
                 import io
                 h, w = img.size
                 scale = width / float(w)
                 new_w, new_h = int(w*scale), int(h*scale)
                 img_resized = img.resize((new_w, new_h), Image.Resampling.LANCZOS)
-                # Convert to JPEG bytes
+                # Convert to JPEG bytes with lower quality to reduce size
                 buf = io.BytesIO()
-                img_resized.save(buf, format='JPEG', quality=60)
+                img_resized.save(buf, format='JPEG', quality=quality, optimize=True)
                 buf.seek(0)
-                return base64.b64encode(buf.read()).decode("ascii")
+                img_bytes = buf.read()
+                img_b64 = base64.b64encode(img_bytes).decode("ascii")
+                # Check size - Adafruit IO limit is 1024 bytes
+                if len(img_b64) > 1000:  # Leave some margin
+                    # Try even smaller/lower quality
+                    img_resized = img.resize((60, 45), Image.Resampling.LANCZOS)
+                    buf = io.BytesIO()
+                    img_resized.save(buf, format='JPEG', quality=30, optimize=True)
+                    buf.seek(0)
+                    img_bytes = buf.read()
+                    img_b64 = base64.b64encode(img_bytes).decode("ascii")
+                return img_b64
             except Exception as e:
                 print(f"[telemetry] picamera2 capture failed: {e}", file=sys.stderr)
                 return None
