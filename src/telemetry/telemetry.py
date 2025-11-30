@@ -28,6 +28,14 @@ try:
 except Exception:
     pass
 
+# Optional picamera2 (better for Raspberry Pi)
+Picamera2 = None
+try:
+    from picamera2 import Picamera2
+    Picamera2 = Picamera2
+except Exception:
+    pass
+
 def now_iso(): return datetime.datetime.now().isoformat(timespec="seconds")
 
 def load_cfg():
@@ -83,29 +91,64 @@ def read_ultra_cached(max_age=2.5) -> Optional[float]:
 class CamReader:
     def __init__(self):
         self.cap = None
+        self.picam = None
         self.prev_frame = None
-        if cv2:
+        # Try picamera2 first (better for Raspberry Pi)
+        if Picamera2:
+            try:
+                self.picam = Picamera2()
+                self.picam.start()
+                print("[telemetry] Camera initialized with picamera2", file=sys.stderr)
+            except Exception as e:
+                print(f"[telemetry] picamera2 failed: {e}, trying OpenCV...", file=sys.stderr)
+                self.picam = None
+        # Fallback to OpenCV
+        if not self.picam and cv2:
             try:
                 cap = cv2.VideoCapture(0)
                 if cap and cap.isOpened():
                     self.cap = cap
-            except Exception:
+                    print("[telemetry] Camera initialized with OpenCV", file=sys.stderr)
+            except Exception as e:
+                print(f"[telemetry] OpenCV failed: {e}", file=sys.stderr)
                 self.cap = None
     def status(self) -> str:
-        return "online" if self.cap else "offline"
+        return "online" if (self.picam or self.cap) else "offline"
     def thumb_b64(self, width=160) -> Optional[str]:
-        if not (self.cap and cv2): return None
-        try:
-            ok, frame = self.cap.read()
-            if not ok: return None
-            h, w = frame.shape[:2]
-            scale = width / float(w)
-            frame = cv2.resize(frame, (int(w*scale), int(h*scale)))
-            ok, buf = cv2.imencode(".jpg", frame, [int(cv2.IMWRITE_JPEG_QUALITY), 60])
-            if not ok: return None
-            return base64.b64encode(buf.tobytes()).decode("ascii")
-        except Exception:
-            return None
+        # Try picamera2 first
+        if self.picam:
+            try:
+                # Capture image (picamera2 returns PIL Image)
+                img = self.picam.capture_image()
+                # Resize using PIL
+                from PIL import Image
+                import io
+                h, w = img.size
+                scale = width / float(w)
+                new_w, new_h = int(w*scale), int(h*scale)
+                img_resized = img.resize((new_w, new_h), Image.Resampling.LANCZOS)
+                # Convert to JPEG bytes
+                buf = io.BytesIO()
+                img_resized.save(buf, format='JPEG', quality=60)
+                buf.seek(0)
+                return base64.b64encode(buf.read()).decode("ascii")
+            except Exception as e:
+                print(f"[telemetry] picamera2 capture failed: {e}", file=sys.stderr)
+                return None
+        # Fallback to OpenCV
+        if self.cap and cv2:
+            try:
+                ok, frame = self.cap.read()
+                if not ok: return None
+                h, w = frame.shape[:2]
+                scale = width / float(w)
+                frame = cv2.resize(frame, (int(w*scale), int(h*scale)))
+                ok, buf = cv2.imencode(".jpg", frame, [int(cv2.IMWRITE_JPEG_QUALITY), 60])
+                if not ok: return None
+                return base64.b64encode(buf.tobytes()).decode("ascii")
+            except Exception:
+                return None
+        return None
     def get_motion_value(self) -> Optional[float]:
         """Get motion detection value (0-100) as Sensor 3 data"""
         if not (self.cap and cv2): return None
@@ -144,7 +187,11 @@ class CamReader:
             return None
     def close(self):
         try:
-            if self.cap: self.cap.release()
+            if self.picam:
+                self.picam.stop()
+                self.picam.close()
+            if self.cap:
+                self.cap.release()
         except Exception: pass
 
 # ---------- MQTT (TLS + reconnect/backoff) ----------
