@@ -162,13 +162,18 @@ python3 src/command_listener.py
 
 ### Terminal 2: Telemetry Publisher (Required for Data Sync)
 
+**Note:** Run telemetry with system Python (outside venv) for camera support:
+
 ```bash
 cd ~/iot-robot
-source .venv/bin/activate
+# Make sure you're NOT in venv (deactivate if needed)
+deactivate 2>/dev/null || true
 export DATABASE_URL="your_neon_database_url"
 cd src/telemetry
 python3 telemetry_runner.py
 ```
+
+**Why outside venv?** The camera requires `python3-libcamera` (system package) which is only accessible outside the virtual environment. Command listener can run in venv, but telemetry needs system Python for camera support.
 
 ### Local Testing: Manual Control (car_tui.py)
 
