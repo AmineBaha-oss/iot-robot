@@ -8,7 +8,7 @@ IoT Smart Mobile Robot (Raspberry Pi) — Complete IoT system with telemetry, au
 
 ---
 
-##  Milestone 3 - Submission Information
+## Milestone 3 - Submission Information
 
 ### Team Members
 
@@ -29,8 +29,7 @@ IoT Smart Mobile Robot (Raspberry Pi) — Complete IoT system with telemetry, au
 | Adafruit IO Dashboard | https://io.adafruit.com/aminebaha/dashboards |
 | Neon.com Database     | https://console.neon.tech                    |
 | Flask Web App         | https://iot-robot-car.onrender.com           |
-| Video Demo            | https://youtu.be/UQeRBX9_ABQ                  |
-
+| Video Demo            | https://youtu.be/UQeRBX9_ABQ                 |
 
 <img width="1440" height="900" alt="Screenshot 2025-12-02 at 1 05 33 AM" src="https://github.com/user-attachments/assets/ada6f9a6-8de3-4965-8e0d-f97728528a66" />
 
@@ -259,23 +258,23 @@ python app.py
 ### Sensor Feeds (Robot → Cloud)
 
 **Sensor 1: Ultrasonic Distance**
-| Feed Name        | Description         | Values            |
+| Feed Name | Description | Values |
 | ---------------- | ------------------- | ----------------- |
-| `ultra-distance` | Ultrasonic distance | 0-400 cm          |
+| `ultra-distance` | Ultrasonic distance | 0-400 cm |
 
 **Sensor 2: Infrared Line Sensors**
-| Feed Name        | Description         | Values            |
+| Feed Name | Description | Values |
 | ---------------- | ------------------- | ----------------- |
-| `line-ir-left`   | IR Left sensor      | 0 or 1            |
-| `line-ir-center` | IR Center sensor    | 0 or 1            |
-| `line-ir-right`  | IR Right sensor     | 0 or 1            |
-| `line-state`     | Combined line state | L, M, R, LM, etc. |
+| `line-ir-left` | IR Left sensor | 0 or 1 |
+| `line-ir-center` | IR Center sensor | 0 or 1 |
+| `line-ir-right` | IR Right sensor | 0 or 1 |
+| `line-state` | Combined line state | L, M, R, LM, etc. |
 
 **Sensor 3: Camera Feed**
-| Feed Name        | Description                    | Values            |
+| Feed Name | Description | Values |
 | ---------------- | ------------------------------ | ----------------- |
-| `cam-motion`     | Camera thumbnail (base64 image) | JPEG image data (base64 encoded) |
-| `cam-status`     | Camera status                  | online/offline    |
+| `cam-motion` | Camera thumbnail (base64 image) | JPEG image data (base64 encoded) |
+| `cam-status` | Camera status | online/offline |
 
 **Note:** The `cam-motion` feed contains the camera thumbnail as a base64-encoded JPEG image. The Flask web application automatically detects and displays this as a live camera feed on the dashboard.
 
@@ -399,7 +398,7 @@ pip install smbus smbus2 spidev RPi.GPIO numpy
 
 ## 🎥 Video Demonstration
 
-**YouTube:** https://www.youtube.com/watch?v=mzLmGYfJ0nY
+**YouTube:** https://youtu.be/UQeRBX9_ABQ
 
 ---
 
