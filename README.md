@@ -31,6 +31,9 @@ IoT Smart Mobile Robot (Raspberry Pi) — Complete IoT system with telemetry, au
 | Flask Web App         | https://iot-robot-car.onrender.com           |
 | Video Demo            | https://www.youtube.com/watch?v=mzLmGYfJ0nY  |
 
+
+<img width="1440" height="900" alt="Screenshot 2025-12-02 at 1 05 33 AM" src="https://github.com/user-attachments/assets/ada6f9a6-8de3-4965-8e0d-f97728528a66" />
+
 ---
 
 ## 📦 Requirements & Installation
