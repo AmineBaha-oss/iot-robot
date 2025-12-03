@@ -395,6 +395,11 @@ pip install smbus smbus2 spidev RPi.GPIO numpy
 - Ensure `.c-2` is in hostname (pooler URL)
 
 ---
+### ⚠️ Biggest Challenge in the Project
+
+The hardest part of this project was designing a reliable system for **controlling the robot through command listening while simultaneously managing telemetry and database synchronization**. Since the Raspberry Pi’s **GPIO cannot be accessed by two processes at the same time**, I had to architect a workflow that avoids hardware conflicts. To solve this, I built a dedicated *command listener* that receives all control commands from Adafruit IO, writes them first into a **local cache**, and then stores them in the **local SQL database**. A separate telemetry process then reads this data safely and publishes sensor information to the cloud. Ensuring that these components worked together without interrupting GPIO access or causing process lockups was the most challenging—and ultimately the most rewarding—part of the entire project.
+
+---
 
 ## 🎥 Video Demonstration
 
